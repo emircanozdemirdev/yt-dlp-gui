@@ -1,0 +1,7 @@
+# Optional bundled binaries (large); app downloads to LocalAppData if missing
+YtDlpGui.App/tools/*.exe
+.vs/
+bin/
+obj/
+*.user
+*.suo

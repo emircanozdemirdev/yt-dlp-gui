@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="tools\yt-dlp.exe" CopyToOutputDirectory="PreserveNewest" Link="tools\yt-dlp.exe" Condition="Exists('tools\yt-dlp.exe')" />
+    <Content Include="tools\ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" Link="tools\ffmpeg.exe" Condition="Exists('tools\ffmpeg.exe')" />
+  </ItemGroup>
+
+</Project>
