@@ -11,4 +11,5 @@ public sealed class AppSettings
     public int Retries { get; set; } = 3;
     public string? Proxy { get; set; }
     public int? RateLimitKbps { get; set; }
+    public AppTheme Theme { get; set; } = AppTheme.Dark;
 }

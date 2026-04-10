@@ -77,6 +77,11 @@ internal static class AppSettingsJson
             s.RateLimitKbps = rate;
         }
 
+        if (TryGetTheme(root, nameof(AppSettings.Theme), out var theme))
+        {
+            s.Theme = theme;
+        }
+
         return s;
     }
 
@@ -161,6 +166,35 @@ internal static class AppSettingsJson
 
         if (el.ValueKind == JsonValueKind.String &&
             int.TryParse(el.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetTheme(JsonElement root, string name, out AppTheme value)
+    {
+        value = AppTheme.Dark;
+        if (!TryGetPropertyCi(root, name, out var el))
+        {
+            return false;
+        }
+
+        if (el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out var numeric))
+        {
+            if (Enum.IsDefined(typeof(AppTheme), numeric))
+            {
+                value = (AppTheme)numeric;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (el.ValueKind == JsonValueKind.String &&
+            Enum.TryParse<AppTheme>(el.GetString(), true, out var parsed))
         {
             value = parsed;
             return true;

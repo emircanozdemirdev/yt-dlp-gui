@@ -7,7 +7,9 @@ using YtDlpGui.App.Services;
 
 namespace YtDlpGui.App.ViewModels;
 
-public partial class SettingsViewModel(ISettingsService settingsService) : ObservableObject
+public partial class SettingsViewModel(
+    ISettingsService settingsService,
+    IThemeService themeService) : ObservableObject
 {
     [ObservableProperty]
     private AppSettings current = new();
@@ -20,6 +22,12 @@ public partial class SettingsViewModel(ISettingsService settingsService) : Obser
 
     [ObservableProperty]
     private string retriesInput = "3";
+
+    [ObservableProperty]
+    private AppTheme selectedTheme = AppTheme.Dark;
+
+    public IReadOnlyList<AppTheme> ThemeOptions { get; } =
+        [AppTheme.Dark, AppTheme.Light];
 
     /// <summary>Shows output path with "Users\user" instead of the real account name (two-way binding).</summary>
     public string OutputDirectoryDisplay
@@ -48,6 +56,7 @@ public partial class SettingsViewModel(ISettingsService settingsService) : Obser
         Current = await settingsService.LoadAsync();
         MaxParallelDownloadsInput = Current.MaxParallelDownloads.ToString(CultureInfo.InvariantCulture);
         RetriesInput = Current.Retries.ToString(CultureInfo.InvariantCulture);
+        SelectedTheme = Current.Theme;
         OnPropertyChanged(nameof(OutputDirectoryDisplay));
     }
 
@@ -78,6 +87,8 @@ public partial class SettingsViewModel(ISettingsService settingsService) : Obser
 
         Current.MaxParallelDownloads = maxParallel;
         Current.Retries = retries;
+        Current.Theme = SelectedTheme;
+        themeService.Apply(SelectedTheme);
         await settingsService.SaveAsync(Current);
         StatusMessage = "Settings saved.";
     }

@@ -9,9 +9,10 @@ public partial class MainViewModel : ObservableObject
         IYtDlpService ytDlpService,
         IQueueService queueService,
         ISettingsService settingsService,
-        IHistoryService historyService)
+        IHistoryService historyService,
+        IThemeService themeService)
     {
-        Settings = new SettingsViewModel(settingsService);
+        Settings = new SettingsViewModel(settingsService, themeService);
         QuickDownload = new QuickDownloadViewModel(ytDlpService, queueService, Settings);
         Queue = new QueueViewModel(queueService);
         History = new HistoryViewModel(historyService);

@@ -4,7 +4,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Themes/Ui.xaml"/>
+                <ResourceDictionary Source="Themes/UiShared.xaml"/>
+                <ResourceDictionary Source="Themes/UiColorsDark.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

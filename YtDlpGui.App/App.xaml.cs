@@ -19,8 +19,16 @@ public partial class App : Application
             var settingsService = new SettingsService();
             var historyService = new HistoryService();
             var queueService = new QueueService(ytDlpService, settingsService, historyService);
+            var themeService = new ThemeService();
+            var settings = await settingsService.LoadAsync();
+            themeService.Apply(settings.Theme);
 
-            var mainVm = new MainViewModel(ytDlpService, queueService, settingsService, historyService);
+            var mainVm = new MainViewModel(
+                ytDlpService,
+                queueService,
+                settingsService,
+                historyService,
+                themeService);
             await mainVm.InitializeAsync();
 
             var mainWindow = new MainWindow
@@ -29,6 +37,7 @@ public partial class App : Application
             };
 
             mainWindow.Show();
+            themeService.Apply(settings.Theme);
         }
         catch (Exception ex)
         {

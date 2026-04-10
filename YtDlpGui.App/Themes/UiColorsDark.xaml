@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Color x:Key="ColorBg">#FF0F1218</Color>
+    <Color x:Key="ColorCard">#FF1A1F28</Color>
+    <Color x:Key="ColorSurface">#FF151A22</Color>
+    <Color x:Key="ColorBorder">#FF2E3540</Color>
+    <Color x:Key="ColorBorderSubtle">#FF232933</Color>
+    <Color x:Key="ColorText">#FFF1F5F9</Color>
+    <Color x:Key="ColorMuted">#FF94A3B8</Color>
+    <Color x:Key="ColorAccent">#FF6366F1</Color>
+    <Color x:Key="ColorAccentHover">#FF818CF8</Color>
+    <Color x:Key="ColorGridHeader">#FF1E2430</Color>
+    <Color x:Key="ColorGridAlt">#FF12171E</Color>
+    <Color x:Key="ColorTabBar">#FF141820</Color>
+    <Color x:Key="ColorTabHover">#FF1E2430</Color>
+    <Color x:Key="ColorTabSelected">#FF202734</Color>
+    <Color x:Key="ColorComboBoxItemHighlight">#FF2D3A5C</Color>
+
+    <SolidColorBrush x:Key="BrushBg" Color="{StaticResource ColorBg}"/>
+    <SolidColorBrush x:Key="BrushCard" Color="{StaticResource ColorCard}"/>
+    <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}"/>
+    <SolidColorBrush x:Key="BrushBorder" Color="{StaticResource ColorBorder}"/>
+    <SolidColorBrush x:Key="BrushBorderSubtle" Color="{StaticResource ColorBorderSubtle}"/>
+    <SolidColorBrush x:Key="BrushText" Color="{StaticResource ColorText}"/>
+    <SolidColorBrush x:Key="BrushMuted" Color="{StaticResource ColorMuted}"/>
+    <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}"/>
+    <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}"/>
+    <SolidColorBrush x:Key="BrushGridHeader" Color="{StaticResource ColorGridHeader}"/>
+    <SolidColorBrush x:Key="BrushGridAlt" Color="{StaticResource ColorGridAlt}"/>
+    <SolidColorBrush x:Key="BrushTabBar" Color="{StaticResource ColorTabBar}"/>
+    <SolidColorBrush x:Key="BrushTabHover" Color="{StaticResource ColorTabHover}"/>
+    <SolidColorBrush x:Key="BrushTabSelected" Color="{StaticResource ColorTabSelected}"/>
+    <SolidColorBrush x:Key="BrushComboBoxItemHighlight" Color="{StaticResource ColorComboBoxItemHighlight}"/>
+</ResourceDictionary>
