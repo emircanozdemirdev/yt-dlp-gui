@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using System.Windows;
 using YtDlpGui.App.Models;
 
@@ -10,16 +11,104 @@ public sealed class QueueService(
     ISettingsService settingsService,
     IHistoryService historyService) : IQueueService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     public ObservableCollection<DownloadJob> Jobs { get; } = [];
 
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> runningJobs = new();
     private readonly SemaphoreSlim queueSignal = new(0);
+    private readonly SemaphoreSlim persistLock = new(1, 1);
+    private readonly string queuePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "YtDlpGui",
+        "queue.json");
     private bool isProcessorStarted;
     private int currentRunningCount;
+
+    public async Task LoadPersistedJobsAsync()
+    {
+        if (!File.Exists(queuePath))
+        {
+            return;
+        }
+
+        List<DownloadJob>? persisted;
+        try
+        {
+            await using var stream = File.OpenRead(queuePath);
+            persisted = await JsonSerializer.DeserializeAsync<List<DownloadJob>>(stream);
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+
+        if (persisted is null || persisted.Count == 0)
+        {
+            return;
+        }
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            foreach (var job in persisted)
+            {
+                if (job.Status is DownloadStatus.Pending or DownloadStatus.Running)
+                {
+                    job.Status = DownloadStatus.Pending;
+                    job.SpeedText = "-";
+                    job.EtaText = "-";
+                    job.Message = "Restored from previous session.";
+                    Jobs.Add(job);
+                }
+            }
+        });
+
+        if (Jobs.Any())
+        {
+            queueSignal.Release();
+            if (!isProcessorStarted)
+            {
+                isProcessorStarted = true;
+                _ = Task.Run(ProcessLoopAsync);
+            }
+        }
+    }
+
+    public async Task PersistAsync()
+    {
+        await persistLock.WaitAsync();
+        try
+        {
+            var directory = Path.GetDirectoryName(queuePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            List<DownloadJob> snapshot = [];
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var job in Jobs)
+                {
+                    if (job.Status is DownloadStatus.Pending or DownloadStatus.Running)
+                    {
+                        snapshot.Add(job);
+                    }
+                }
+            });
+
+            await using var stream = File.Create(queuePath);
+            await JsonSerializer.SerializeAsync(stream, snapshot, JsonOptions);
+        }
+        finally
+        {
+            persistLock.Release();
+        }
+    }
 
     public async Task EnqueueAsync(DownloadJob job)
     {
         Application.Current.Dispatcher.Invoke(() => Jobs.Add(job));
+        await PersistAsync();
         queueSignal.Release();
 
         if (!isProcessorStarted)
@@ -36,6 +125,15 @@ public sealed class QueueService(
         if (runningJobs.TryGetValue(id, out var cts))
         {
             cts.Cancel();
+            return;
+        }
+
+        var pending = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Pending);
+        if (pending is not null)
+        {
+            pending.Status = DownloadStatus.Canceled;
+            pending.Message = "Download canceled.";
+            _ = PersistAsync();
         }
     }
 
@@ -60,6 +158,7 @@ public sealed class QueueService(
                 {
                     await RunJobAsync(job);
                     Interlocked.Decrement(ref currentRunningCount);
+                    await PersistAsync();
                     queueSignal.Release();
                 });
             }

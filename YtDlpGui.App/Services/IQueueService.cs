@@ -6,6 +6,8 @@ namespace YtDlpGui.App.Services;
 public interface IQueueService
 {
     ObservableCollection<DownloadJob> Jobs { get; }
+    Task LoadPersistedJobsAsync();
+    Task PersistAsync();
     Task EnqueueAsync(DownloadJob job);
     void Cancel(Guid id);
 }

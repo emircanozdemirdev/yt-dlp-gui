@@ -7,6 +7,8 @@ namespace YtDlpGui.App;
 
 public partial class App : Application
 {
+    private IQueueService? queueService;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -18,14 +20,14 @@ public partial class App : Application
             var ytDlpService = new YtDlpService(processRunner, progressParser);
             var settingsService = new SettingsService();
             var historyService = new HistoryService();
-            var queueService = new QueueService(ytDlpService, settingsService, historyService);
+            queueService = new QueueService(ytDlpService, settingsService, historyService);
             var themeService = new ThemeService();
             var settings = await settingsService.LoadAsync();
             themeService.Apply(settings.Theme);
 
             var mainVm = new MainViewModel(
                 ytDlpService,
-                queueService,
+                this.queueService,
                 settingsService,
                 historyService,
                 themeService);
@@ -48,5 +50,19 @@ public partial class App : Application
                 MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            queueService?.PersistAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Best-effort persistence on app close.
+        }
+
+        base.OnExit(e);
     }
 }

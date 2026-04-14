@@ -5,6 +5,8 @@ namespace YtDlpGui.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
+    private readonly IQueueService queueService;
+
     public MainViewModel(
         IYtDlpService ytDlpService,
         IQueueService queueService,
@@ -12,6 +14,7 @@ public partial class MainViewModel : ObservableObject
         IHistoryService historyService,
         IThemeService themeService)
     {
+        this.queueService = queueService;
         Settings = new SettingsViewModel(settingsService, themeService);
         QuickDownload = new QuickDownloadViewModel(ytDlpService, queueService, Settings);
         Queue = new QueueViewModel(queueService);
@@ -20,6 +23,7 @@ public partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        await queueService.LoadPersistedJobsAsync();
         await Settings.LoadAsync();
         await History.LoadAsync();
     }
