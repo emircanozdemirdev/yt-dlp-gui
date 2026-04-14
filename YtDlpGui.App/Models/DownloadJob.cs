@@ -44,6 +44,11 @@ public partial class DownloadJob : ObservableObject
     private string? outputFilePath;
 
     [ObservableProperty]
+    private string? temporaryDirectory;
+
+    private readonly HashSet<string> artifactPaths = [];
+
+    [ObservableProperty]
     private bool isSelected;
 
     public bool CanPauseResume =>
@@ -54,5 +59,32 @@ public partial class DownloadJob : ObservableObject
     {
         OnPropertyChanged(nameof(CanPauseResume));
         OnPropertyChanged(nameof(CanCancel));
+    }
+
+    public void RegisterArtifactPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var normalized = path.Trim().Trim('"');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return;
+        }
+
+        lock (artifactPaths)
+        {
+            artifactPaths.Add(normalized);
+        }
+    }
+
+    public IReadOnlyList<string> GetArtifactPathsSnapshot()
+    {
+        lock (artifactPaths)
+        {
+            return artifactPaths.ToList();
+        }
     }
 }

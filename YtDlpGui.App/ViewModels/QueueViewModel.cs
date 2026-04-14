@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YtDlpGui.App.Models;
@@ -107,18 +106,6 @@ public partial class QueueViewModel : ObservableObject
     private void PauseResumeSelected()
     {
         var selected = Jobs.Where(x => x.IsSelected).ToList();
-        // #region agent log
-        WriteDebugLog(
-            "pre-fix-1",
-            "H1",
-            "QueueViewModel.cs:PauseResumeSelected",
-            "PauseResumeSelected invoked",
-            new
-            {
-                selectedCount = selected.Count,
-                selected = selected.Select(x => new { x.Id, status = x.Status.ToString(), x.ProgressPercent }).ToList()
-            });
-        // #endregion
         foreach (var job in selected)
         {
             PauseResume(job);
@@ -180,32 +167,5 @@ public partial class QueueViewModel : ObservableObject
         SelectedCount = Jobs.Count(x => x.IsSelected);
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectionSummary));
-    }
-
-    private static void WriteDebugLog(
-        string runId,
-        string hypothesisId,
-        string location,
-        string message,
-        object data)
-    {
-        try
-        {
-            var payload = new
-            {
-                sessionId = "0b91bd",
-                runId,
-                hypothesisId,
-                location,
-                message,
-                data,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            File.AppendAllText("debug-0b91bd.log", JsonSerializer.Serialize(payload) + Environment.NewLine);
-        }
-        catch
-        {
-            // Best-effort debug logging.
-        }
     }
 }

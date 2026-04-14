@@ -106,6 +106,15 @@ public sealed class QueueService(
                 }
             });
 
+            if (snapshot.Count == 0)
+            {
+                if (File.Exists(queuePath))
+                {
+                    File.Delete(queuePath);
+                }
+                return;
+            }
+
             await using var stream = File.Create(queuePath);
             await JsonSerializer.SerializeAsync(stream, snapshot, JsonOptions);
         }
@@ -154,16 +163,6 @@ public sealed class QueueService(
 
     public void Pause(Guid id)
     {
-        var before = Jobs.FirstOrDefault(x => x.Id == id)?.Status.ToString() ?? "missing";
-        // #region agent log
-        WriteDebugLog(
-            "pre-fix-1",
-            "H2",
-            "QueueService.cs:Pause",
-            "Pause requested",
-            new { id, before, isRunning = runningJobs.ContainsKey(id) });
-        // #endregion
-
         if (runningJobs.TryGetValue(id, out var cts))
         {
             pauseRequestedJobs[id] = 1;
@@ -182,19 +181,6 @@ public sealed class QueueService(
 
     public void Resume(Guid id)
     {
-        // #region agent log
-        WriteDebugLog(
-            "pre-fix-1",
-            "H1",
-            "QueueService.cs:Resume",
-            "Resume requested",
-            new
-            {
-                id,
-                currentStatus = Jobs.FirstOrDefault(x => x.Id == id)?.Status.ToString() ?? "missing"
-            });
-        // #endregion
-
         pauseRequestedJobs.TryRemove(id, out _);
 
         var paused = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Paused);
@@ -313,6 +299,15 @@ public sealed class QueueService(
         try
         {
             job.Status = DownloadStatus.Running;
+            if (string.IsNullOrWhiteSpace(job.TemporaryDirectory))
+            {
+                job.TemporaryDirectory = Path.Combine(
+                    Path.GetTempPath(),
+                    "YtDlpGui",
+                    "downloads",
+                    job.Id.ToString("N"));
+            }
+            Directory.CreateDirectory(job.TemporaryDirectory);
             var settings = await settingsService.LoadAsync();
             var progress = new Progress<ProgressUpdate>(update =>
             {
@@ -372,14 +367,6 @@ public sealed class QueueService(
             job.Status = DownloadStatus.Completed;
             job.ResumePartialDownload = false;
             job.Message = "Download completed.";
-            // #region agent log
-            WriteDebugLog(
-                "pre-fix-1",
-                "H3",
-                "QueueService.cs:RunJobAsync",
-                "Job completed path reached",
-                new { jobId = job.Id, job.Url, job.ProgressPercent, job.Message });
-            // #endregion
 
             await historyService.AddAsync(new DownloadHistoryItem
             {
@@ -399,28 +386,12 @@ public sealed class QueueService(
                 job.Message = "Download paused.";
                 job.SpeedText = "-";
                 job.EtaText = "-";
-                // #region agent log
-                WriteDebugLog(
-                    "pre-fix-1",
-                    "H2",
-                    "QueueService.cs:RunJobAsync",
-                    "OperationCanceled handled as paused",
-                    new { jobId = job.Id, job.Url, job.ProgressPercent, status = job.Status.ToString() });
-                // #endregion
             }
             else
             {
                 MarkCanceledAndLog(job);
                 CleanupCanceledArtifacts(job);
                 Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
-                // #region agent log
-                WriteDebugLog(
-                    "pre-fix-1",
-                    "H4",
-                    "QueueService.cs:RunJobAsync",
-                    "OperationCanceled handled as canceled",
-                    new { jobId = job.Id, job.Url, removedFromQueue = true });
-                // #endregion
             }
         }
         catch (Exception ex)
@@ -447,33 +418,56 @@ public sealed class QueueService(
 
     private static void CleanupCanceledArtifacts(DownloadJob job)
     {
-        if (string.IsNullOrWhiteSpace(job.OutputFilePath))
+        if (!string.IsNullOrWhiteSpace(job.TemporaryDirectory) && Directory.Exists(job.TemporaryDirectory))
         {
-            return;
-        }
-
-        var resolvedPath = job.OutputFilePath.Trim();
-        var directory = Path.GetDirectoryName(resolvedPath);
-        var fileName = Path.GetFileName(resolvedPath);
-        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName) || !Directory.Exists(directory))
-        {
-            return;
-        }
-
-        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            resolvedPath,
-            $"{resolvedPath}.part",
-            $"{resolvedPath}.ytdl"
-        };
-
-        var searchPattern = $"{fileName}*";
-        foreach (var path in Directory.EnumerateFiles(directory, searchPattern))
-        {
-            if (path.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ||
-                path.EndsWith(".ytdl", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                candidates.Add(path);
+                Directory.Delete(job.TemporaryDirectory, recursive: true);
+            }
+            catch
+            {
+                // Best-effort cleanup.
+            }
+        }
+
+        var artifacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in job.GetArtifactPathsSnapshot())
+        {
+            artifacts.Add(path);
+        }
+
+        if (!string.IsNullOrWhiteSpace(job.OutputFilePath))
+        {
+            artifacts.Add(job.OutputFilePath.Trim());
+        }
+
+        if (artifacts.Count == 0)
+        {
+            return;
+        }
+
+        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var artifact in artifacts)
+        {
+            candidates.Add(artifact);
+            candidates.Add($"{artifact}.part");
+            candidates.Add($"{artifact}.ytdl");
+
+            var directory = Path.GetDirectoryName(artifact);
+            var fileName = Path.GetFileName(artifact);
+            if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName) || !Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            var searchPattern = $"{fileName}*";
+            foreach (var path in Directory.EnumerateFiles(directory, searchPattern))
+            {
+                if (path.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".ytdl", StringComparison.OrdinalIgnoreCase))
+                {
+                    candidates.Add(path);
+                }
             }
         }
 
@@ -495,15 +489,6 @@ public sealed class QueueService(
 
     private void MarkCanceledAndLog(DownloadJob job)
     {
-        // #region agent log
-        WriteDebugLog(
-            "pre-fix-1",
-            "H4",
-            "QueueService.cs:MarkCanceledAndLog",
-            "MarkCanceledAndLog invoked",
-            new { jobId = job.Id, job.Url, previousStatus = job.Status.ToString() });
-        // #endregion
-
         job.Status = DownloadStatus.Canceled;
         job.ResumePartialDownload = false;
         job.ProgressPercent = 0;
@@ -518,32 +503,5 @@ public sealed class QueueService(
             IsSuccess = false,
             Message = "Canceled"
         });
-    }
-
-    private static void WriteDebugLog(
-        string runId,
-        string hypothesisId,
-        string location,
-        string message,
-        object data)
-    {
-        try
-        {
-            var payload = new
-            {
-                sessionId = "0b91bd",
-                runId,
-                hypothesisId,
-                location,
-                message,
-                data,
-                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            File.AppendAllText("debug-0b91bd.log", JsonSerializer.Serialize(payload) + Environment.NewLine);
-        }
-        catch
-        {
-            // Best-effort debug logging.
-        }
     }
 }

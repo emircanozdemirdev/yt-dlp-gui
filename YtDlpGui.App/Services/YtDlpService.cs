@@ -145,11 +145,21 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(job.OutputDirectory);
+        if (string.IsNullOrWhiteSpace(job.TemporaryDirectory))
+        {
+            job.TemporaryDirectory = Path.Combine(
+                Path.GetTempPath(),
+                "YtDlpGui",
+                "downloads",
+                job.Id.ToString("N"));
+        }
+        Directory.CreateDirectory(job.TemporaryDirectory);
         var formatArg = string.IsNullOrWhiteSpace(job.SelectedFormatId) ? "best" : job.SelectedFormatId;
         var continueArg = job.ResumePartialDownload ? "--continue " : "--no-continue ";
 
         var args =
             $"-f \"{formatArg}\" --newline --retries {settings.Retries} {continueArg}" +
+            $"--paths \"temp:{job.TemporaryDirectory}\" " +
             $"{(string.IsNullOrWhiteSpace(settings.Proxy) ? string.Empty : $"--proxy \"{settings.Proxy}\" ")}" +
             $"{(settings.RateLimitKbps is null ? string.Empty : $"--limit-rate {settings.RateLimitKbps}K ")}" +
             $"--ffmpeg-location \"{settings.FfmpegPath}\" " +
@@ -193,14 +203,18 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
         const string destinationPrefix = "[download] Destination: ";
         if (line.StartsWith(destinationPrefix, StringComparison.Ordinal))
         {
-            job.OutputFilePath = line[destinationPrefix.Length..].Trim().Trim('"');
+            var path = line[destinationPrefix.Length..].Trim().Trim('"');
+            job.OutputFilePath = path;
+            job.RegisterArtifactPath(path);
             return;
         }
 
         const string mergePrefix = "[Merger] Merging formats into ";
         if (line.StartsWith(mergePrefix, StringComparison.Ordinal))
         {
-            job.OutputFilePath = line[mergePrefix.Length..].Trim().Trim('"');
+            var path = line[mergePrefix.Length..].Trim().Trim('"');
+            job.OutputFilePath = path;
+            job.RegisterArtifactPath(path);
         }
     }
 }
