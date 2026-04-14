@@ -28,11 +28,20 @@ public partial class QueueViewModel : ObservableObject
 
     public ObservableCollection<DownloadJob> Jobs { get; }
     public bool HasSelection => SelectedCount > 0;
+    public bool CanPauseResumeSelected =>
+        Jobs.Any(x => x.IsSelected && x.Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused);
+    public bool CanCancelSelected =>
+        Jobs.Any(x => x.IsSelected && x.Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused);
+    public bool CanRetrySelected =>
+        Jobs.Any(x => x.IsSelected && x.Status is DownloadStatus.Failed or DownloadStatus.Canceled or DownloadStatus.Completed);
     public string SelectionSummary => $"{SelectedCount} selected / {Jobs.Count} total";
 
     partial void OnSelectedCountChanged(int value)
     {
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(CanPauseResumeSelected));
+        OnPropertyChanged(nameof(CanCancelSelected));
+        OnPropertyChanged(nameof(CanRetrySelected));
         OnPropertyChanged(nameof(SelectionSummary));
     }
 
@@ -156,7 +165,8 @@ public partial class QueueViewModel : ObservableObject
 
     private void OnJobPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(DownloadJob.IsSelected))
+        if (e.PropertyName == nameof(DownloadJob.IsSelected) ||
+            e.PropertyName == nameof(DownloadJob.Status))
         {
             RecalculateSelectionState();
         }
@@ -166,6 +176,9 @@ public partial class QueueViewModel : ObservableObject
     {
         SelectedCount = Jobs.Count(x => x.IsSelected);
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(CanPauseResumeSelected));
+        OnPropertyChanged(nameof(CanCancelSelected));
+        OnPropertyChanged(nameof(CanRetrySelected));
         OnPropertyChanged(nameof(SelectionSummary));
     }
 }

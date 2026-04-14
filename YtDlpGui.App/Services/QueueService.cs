@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Text.Json;
-using System.Windows;
+using YtDlpGui.App.Infrastructure;
 using YtDlpGui.App.Models;
 
 namespace YtDlpGui.App.Services;
@@ -9,7 +9,8 @@ namespace YtDlpGui.App.Services;
 public sealed class QueueService(
     IYtDlpService ytDlpService,
     ISettingsService settingsService,
-    IHistoryService historyService) : IQueueService
+    IHistoryService historyService,
+    IUiDispatcher uiDispatcher) : IQueueService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     public ObservableCollection<DownloadJob> Jobs { get; } = [];
@@ -49,7 +50,7 @@ public sealed class QueueService(
             return;
         }
 
-        Application.Current.Dispatcher.Invoke(() =>
+        uiDispatcher.Invoke(() =>
         {
             foreach (var job in persisted)
             {
@@ -96,7 +97,7 @@ public sealed class QueueService(
             }
 
             List<DownloadJob> snapshot = [];
-            Application.Current.Dispatcher.Invoke(() =>
+            uiDispatcher.Invoke(() =>
             {
                 foreach (var job in Jobs)
                 {
@@ -127,7 +128,7 @@ public sealed class QueueService(
 
     public async Task EnqueueAsync(DownloadJob job)
     {
-        Application.Current.Dispatcher.Invoke(() => Jobs.Add(job));
+        uiDispatcher.Invoke(() => Jobs.Add(job));
         await PersistAsync();
         queueSignal.Release();
 
@@ -160,7 +161,7 @@ public sealed class QueueService(
             {
                 _ = Task.Run(() => CleanupCanceledArtifacts(queued));
             }
-            Application.Current.Dispatcher.Invoke(() => Jobs.Remove(queued));
+            uiDispatcher.Invoke(() => Jobs.Remove(queued));
             _ = PersistAsync();
         }
     }
@@ -264,7 +265,7 @@ public sealed class QueueService(
             Cancel(id);
         }
 
-        Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
+        uiDispatcher.Invoke(() => Jobs.Remove(job));
         _ = PersistAsync();
     }
 
@@ -403,7 +404,7 @@ public sealed class QueueService(
                 {
                     CleanupCanceledArtifacts(job);
                 }
-                Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
+                uiDispatcher.Invoke(() => Jobs.Remove(job));
             }
         }
         catch (Exception ex)

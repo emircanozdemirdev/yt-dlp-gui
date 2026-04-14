@@ -20,7 +20,8 @@ public partial class App : Application
             var ytDlpService = new YtDlpService(processRunner, progressParser);
             var settingsService = new SettingsService();
             var historyService = new HistoryService();
-            queueService = new QueueService(ytDlpService, settingsService, historyService);
+            var uiDispatcher = new WpfUiDispatcher();
+            queueService = new QueueService(ytDlpService, settingsService, historyService, uiDispatcher);
             var themeService = new ThemeService();
             var settings = await settingsService.LoadAsync();
             themeService.Apply(settings.Theme);

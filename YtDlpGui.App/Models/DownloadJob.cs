@@ -54,11 +54,13 @@ public partial class DownloadJob : ObservableObject
     public bool CanPauseResume =>
         Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused;
     public bool CanCancel => Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused;
+    public string PauseResumeActionText => Status == DownloadStatus.Paused ? "Resume" : "Pause";
 
     partial void OnStatusChanged(DownloadStatus value)
     {
         OnPropertyChanged(nameof(CanPauseResume));
         OnPropertyChanged(nameof(CanCancel));
+        OnPropertyChanged(nameof(PauseResumeActionText));
     }
 
     public void RegisterArtifactPath(string? path)

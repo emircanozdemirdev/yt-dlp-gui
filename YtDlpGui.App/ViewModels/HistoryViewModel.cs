@@ -24,6 +24,7 @@ public partial class HistoryViewModel : ObservableObject
 
     public ObservableCollection<DownloadHistoryItem> Items { get; } = [];
     public bool HasSelection => SelectedCount > 0;
+    public bool CanOpenSelectedFolder => Items.Any(x => x.IsSelected && IsFolderOpenable(x.OutputPath));
     public string SelectionSummary => $"{SelectedCount} selected / {Items.Count} total";
 
     public async Task LoadAsync()
@@ -46,6 +47,7 @@ public partial class HistoryViewModel : ObservableObject
     partial void OnSelectedCountChanged(int value)
     {
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(CanOpenSelectedFolder));
         OnPropertyChanged(nameof(SelectionSummary));
     }
 
@@ -136,15 +138,7 @@ public partial class HistoryViewModel : ObservableObject
             return;
         }
 
-        var outputPath = selected.OutputPath?.Trim();
-        if (string.IsNullOrWhiteSpace(outputPath))
-        {
-            return;
-        }
-
-        var folderPath = Directory.Exists(outputPath)
-            ? outputPath
-            : Path.GetDirectoryName(outputPath);
+        var folderPath = ResolveFolderPath(selected.OutputPath);
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {
             return;
@@ -168,5 +162,23 @@ public partial class HistoryViewModel : ObservableObject
     private void RecalculateSelectionState()
     {
         SelectedCount = Items.Count(x => x.IsSelected);
+        OnPropertyChanged(nameof(CanOpenSelectedFolder));
+    }
+
+    private static string? ResolveFolderPath(string? outputPath)
+    {
+        var path = outputPath?.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        return Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+    }
+
+    private static bool IsFolderOpenable(string? outputPath)
+    {
+        var folderPath = ResolveFolderPath(outputPath);
+        return !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath);
     }
 }

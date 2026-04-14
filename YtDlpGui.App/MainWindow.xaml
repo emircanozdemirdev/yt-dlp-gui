@@ -130,13 +130,13 @@
                                 Content="Clear" Command="{Binding Queue.ClearSelectionCommand}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
                                 Content="Pause/Resume Selected" Command="{Binding Queue.PauseResumeSelectedCommand}"
-                                IsEnabled="{Binding Queue.HasSelection}"/>
+                                IsEnabled="{Binding Queue.CanPauseResumeSelected}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="120"
                                 Content="Cancel Selected" Command="{Binding Queue.CancelSelectedCommand}"
-                                IsEnabled="{Binding Queue.HasSelection}"/>
+                                IsEnabled="{Binding Queue.CanCancelSelected}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
                                 Content="Retry Selected" Command="{Binding Queue.RedownloadSelectedCommand}"
-                                IsEnabled="{Binding Queue.HasSelection}"/>
+                                IsEnabled="{Binding Queue.CanRetrySelected}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="120"
                                 Content="Retry Failed" Command="{Binding Queue.RetryFailedCommand}"/>
                         <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource BrushMuted}"
@@ -163,7 +163,7 @@
                                 <DataGridTemplateColumn Header="" Width="108">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource SecondaryButton}" Content="Pause/Resume"
+                                            <Button Style="{StaticResource SecondaryButton}" Content="{Binding PauseResumeActionText}"
                                                     Command="{Binding DataContext.Queue.PauseResumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     IsEnabled="{Binding CanPauseResume}"
                                                     CommandParameter="{Binding}" Padding="8,6" MinHeight="32"/>
@@ -205,7 +205,7 @@
                                 IsEnabled="{Binding History.HasSelection}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
                                 Content="Open Folder" Command="{Binding History.OpenSelectedFolderCommand}"
-                                IsEnabled="{Binding History.HasSelection}"/>
+                                IsEnabled="{Binding History.CanOpenSelectedFolder}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="90"
                                 Content="Delete" Command="{Binding History.DeleteSelectedCommand}"
                                 IsEnabled="{Binding History.HasSelection}"/>
