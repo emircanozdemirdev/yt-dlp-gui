@@ -42,4 +42,20 @@ public partial class DownloadJob : ObservableObject
 
     [ObservableProperty]
     private string? outputFilePath;
+
+    public bool CanPauseResume =>
+        Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused;
+
+    public bool CanCancelOrRetry =>
+        Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused or DownloadStatus.Canceled;
+
+    public string CancelActionText =>
+        Status == DownloadStatus.Canceled ? "Download Again" : "Cancel";
+
+    partial void OnStatusChanged(DownloadStatus value)
+    {
+        OnPropertyChanged(nameof(CanPauseResume));
+        OnPropertyChanged(nameof(CanCancelOrRetry));
+        OnPropertyChanged(nameof(CancelActionText));
+    }
 }

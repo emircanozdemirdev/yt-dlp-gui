@@ -26,6 +26,12 @@ public partial class QueueViewModel : ObservableObject
             return;
         }
 
+        if (job.Status == DownloadStatus.Canceled)
+        {
+            queueService.RetryCanceled(job.Id);
+            return;
+        }
+
         queueService.Cancel(job.Id);
     }
 

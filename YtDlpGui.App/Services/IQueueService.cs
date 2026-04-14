@@ -11,6 +11,7 @@ public interface IQueueService
     Task EnqueueAsync(DownloadJob job);
     void Pause(Guid id);
     void Resume(Guid id);
+    void RetryCanceled(Guid id);
     void RetryFailed();
     void Cancel(Guid id);
 }

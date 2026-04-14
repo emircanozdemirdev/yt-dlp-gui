@@ -61,6 +61,14 @@ public sealed class QueueService(
                     job.Message = "Restored from previous session.";
                     Jobs.Add(job);
                 }
+                else if (job.Status == DownloadStatus.Paused)
+                {
+                    job.ResumePartialDownload = true;
+                    job.SpeedText = "-";
+                    job.EtaText = "-";
+                    job.Message = "Paused from previous session.";
+                    Jobs.Add(job);
+                }
             }
         });
 
@@ -139,6 +147,7 @@ public sealed class QueueService(
         {
             queued.Status = DownloadStatus.Canceled;
             queued.ResumePartialDownload = false;
+            queued.ProgressPercent = 0;
             queued.Message = "Download canceled.";
             queued.SpeedText = "-";
             queued.EtaText = "-";
@@ -206,6 +215,24 @@ public sealed class QueueService(
             return;
         }
 
+        _ = PersistAsync();
+        queueSignal.Release();
+    }
+
+    public void RetryCanceled(Guid id)
+    {
+        var canceled = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Canceled);
+        if (canceled is null)
+        {
+            return;
+        }
+
+        canceled.Status = DownloadStatus.Pending;
+        canceled.ResumePartialDownload = false;
+        canceled.ProgressPercent = 0;
+        canceled.SpeedText = "-";
+        canceled.EtaText = "-";
+        canceled.Message = "Retry queued.";
         _ = PersistAsync();
         queueSignal.Release();
     }
@@ -328,6 +355,7 @@ public sealed class QueueService(
             {
                 job.Status = DownloadStatus.Canceled;
                 job.ResumePartialDownload = false;
+                job.ProgressPercent = 0;
                 job.Message = "Download canceled.";
                 job.SpeedText = "-";
                 job.EtaText = "-";
