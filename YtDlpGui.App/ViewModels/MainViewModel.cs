@@ -18,7 +18,7 @@ public partial class MainViewModel : ObservableObject
         Settings = new SettingsViewModel(settingsService, themeService);
         QuickDownload = new QuickDownloadViewModel(ytDlpService, queueService, Settings);
         Queue = new QueueViewModel(queueService);
-        History = new HistoryViewModel(historyService);
+        History = new HistoryViewModel(historyService, queueService);
     }
 
     public async Task InitializeAsync()

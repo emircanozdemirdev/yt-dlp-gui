@@ -43,4 +43,17 @@ public sealed class HistoryService : IHistoryService
         await using var stream = File.Create(historyPath);
         await JsonSerializer.SerializeAsync(stream, items, JsonOptions);
     }
+
+    public async Task DeleteAsync(IEnumerable<Guid> ids)
+    {
+        var idSet = ids.ToHashSet();
+        if (idSet.Count == 0)
+        {
+            return;
+        }
+
+        var items = (await LoadAsync()).Where(x => !idSet.Contains(x.Id)).ToList();
+        await using var stream = File.Create(historyPath);
+        await JsonSerializer.SerializeAsync(stream, items, JsonOptions);
+    }
 }

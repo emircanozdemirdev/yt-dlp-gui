@@ -145,19 +145,25 @@ public sealed class QueueService(
             (x.Status == DownloadStatus.Pending || x.Status == DownloadStatus.Paused));
         if (queued is not null)
         {
-            queued.Status = DownloadStatus.Canceled;
-            queued.ResumePartialDownload = false;
-            queued.ProgressPercent = 0;
-            queued.Message = "Download canceled.";
-            queued.SpeedText = "-";
-            queued.EtaText = "-";
+            MarkCanceledAndLog(queued);
             CleanupCanceledArtifacts(queued);
+            Application.Current.Dispatcher.Invoke(() => Jobs.Remove(queued));
             _ = PersistAsync();
         }
     }
 
     public void Pause(Guid id)
     {
+        var before = Jobs.FirstOrDefault(x => x.Id == id)?.Status.ToString() ?? "missing";
+        // #region agent log
+        WriteDebugLog(
+            "pre-fix-1",
+            "H2",
+            "QueueService.cs:Pause",
+            "Pause requested",
+            new { id, before, isRunning = runningJobs.ContainsKey(id) });
+        // #endregion
+
         if (runningJobs.TryGetValue(id, out var cts))
         {
             pauseRequestedJobs[id] = 1;
@@ -176,6 +182,19 @@ public sealed class QueueService(
 
     public void Resume(Guid id)
     {
+        // #region agent log
+        WriteDebugLog(
+            "pre-fix-1",
+            "H1",
+            "QueueService.cs:Resume",
+            "Resume requested",
+            new
+            {
+                id,
+                currentStatus = Jobs.FirstOrDefault(x => x.Id == id)?.Status.ToString() ?? "missing"
+            });
+        // #endregion
+
         pauseRequestedJobs.TryRemove(id, out _);
 
         var paused = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Paused);
@@ -219,22 +238,44 @@ public sealed class QueueService(
         queueSignal.Release();
     }
 
-    public void RetryCanceled(Guid id)
+    public void Retry(Guid id)
     {
-        var canceled = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Canceled);
-        if (canceled is null)
+        var job = Jobs.FirstOrDefault(x => x.Id == id);
+        if (job is null)
         {
             return;
         }
 
-        canceled.Status = DownloadStatus.Pending;
-        canceled.ResumePartialDownload = false;
-        canceled.ProgressPercent = 0;
-        canceled.SpeedText = "-";
-        canceled.EtaText = "-";
-        canceled.Message = "Retry queued.";
+        if (job.Status is DownloadStatus.Running or DownloadStatus.Pending)
+        {
+            return;
+        }
+
+        job.Status = DownloadStatus.Pending;
+        job.ResumePartialDownload = false;
+        job.ProgressPercent = 0;
+        job.SpeedText = "-";
+        job.EtaText = "-";
+        job.Message = "Retry queued.";
         _ = PersistAsync();
         queueSignal.Release();
+    }
+
+    public void Remove(Guid id)
+    {
+        var job = Jobs.FirstOrDefault(x => x.Id == id);
+        if (job is null)
+        {
+            return;
+        }
+
+        if (job.Status == DownloadStatus.Running)
+        {
+            Cancel(id);
+        }
+
+        Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
+        _ = PersistAsync();
     }
 
     private async Task ProcessLoopAsync()
@@ -331,6 +372,14 @@ public sealed class QueueService(
             job.Status = DownloadStatus.Completed;
             job.ResumePartialDownload = false;
             job.Message = "Download completed.";
+            // #region agent log
+            WriteDebugLog(
+                "pre-fix-1",
+                "H3",
+                "QueueService.cs:RunJobAsync",
+                "Job completed path reached",
+                new { jobId = job.Id, job.Url, job.ProgressPercent, job.Message });
+            // #endregion
 
             await historyService.AddAsync(new DownloadHistoryItem
             {
@@ -350,16 +399,28 @@ public sealed class QueueService(
                 job.Message = "Download paused.";
                 job.SpeedText = "-";
                 job.EtaText = "-";
+                // #region agent log
+                WriteDebugLog(
+                    "pre-fix-1",
+                    "H2",
+                    "QueueService.cs:RunJobAsync",
+                    "OperationCanceled handled as paused",
+                    new { jobId = job.Id, job.Url, job.ProgressPercent, status = job.Status.ToString() });
+                // #endregion
             }
             else
             {
-                job.Status = DownloadStatus.Canceled;
-                job.ResumePartialDownload = false;
-                job.ProgressPercent = 0;
-                job.Message = "Download canceled.";
-                job.SpeedText = "-";
-                job.EtaText = "-";
+                MarkCanceledAndLog(job);
                 CleanupCanceledArtifacts(job);
+                Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
+                // #region agent log
+                WriteDebugLog(
+                    "pre-fix-1",
+                    "H4",
+                    "QueueService.cs:RunJobAsync",
+                    "OperationCanceled handled as canceled",
+                    new { jobId = job.Id, job.Url, removedFromQueue = true });
+                // #endregion
             }
         }
         catch (Exception ex)
@@ -429,6 +490,60 @@ public sealed class QueueService(
             {
                 // Best-effort cleanup.
             }
+        }
+    }
+
+    private void MarkCanceledAndLog(DownloadJob job)
+    {
+        // #region agent log
+        WriteDebugLog(
+            "pre-fix-1",
+            "H4",
+            "QueueService.cs:MarkCanceledAndLog",
+            "MarkCanceledAndLog invoked",
+            new { jobId = job.Id, job.Url, previousStatus = job.Status.ToString() });
+        // #endregion
+
+        job.Status = DownloadStatus.Canceled;
+        job.ResumePartialDownload = false;
+        job.ProgressPercent = 0;
+        job.Message = "Download canceled.";
+        job.SpeedText = "-";
+        job.EtaText = "-";
+        _ = historyService.AddAsync(new DownloadHistoryItem
+        {
+            Url = job.Url,
+            Title = string.IsNullOrWhiteSpace(job.Title) ? job.Url : job.Title,
+            OutputPath = job.OutputDirectory,
+            IsSuccess = false,
+            Message = "Canceled"
+        });
+    }
+
+    private static void WriteDebugLog(
+        string runId,
+        string hypothesisId,
+        string location,
+        string message,
+        object data)
+    {
+        try
+        {
+            var payload = new
+            {
+                sessionId = "0b91bd",
+                runId,
+                hypothesisId,
+                location,
+                message,
+                data,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            File.AppendAllText("debug-0b91bd.log", JsonSerializer.Serialize(payload) + Environment.NewLine);
+        }
+        catch
+        {
+            // Best-effort debug logging.
         }
     }
 }

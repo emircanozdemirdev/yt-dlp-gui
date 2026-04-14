@@ -124,12 +124,37 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" MinWidth="140"
-                            Content="Retry Failed" Command="{Binding Queue.RetryFailedCommand}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" MinWidth="110"
+                                Content="Select All" Command="{Binding Queue.SelectAllCommand}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="110"
+                                Content="Clear" Command="{Binding Queue.ClearSelectionCommand}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
+                                Content="Pause/Resume Selected" Command="{Binding Queue.PauseResumeSelectedCommand}"
+                                IsEnabled="{Binding Queue.HasSelection}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="120"
+                                Content="Cancel Selected" Command="{Binding Queue.CancelSelectedCommand}"
+                                IsEnabled="{Binding Queue.HasSelection}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
+                                Content="Retry Selected" Command="{Binding Queue.RedownloadSelectedCommand}"
+                                IsEnabled="{Binding Queue.HasSelection}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="120"
+                                Content="Retry Failed" Command="{Binding Queue.RetryFailedCommand}"/>
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource BrushMuted}"
+                                   Text="{Binding Queue.SelectionSummary}"/>
+                    </StackPanel>
                     <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
                             BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
                         <DataGrid ItemsSource="{Binding Queue.Jobs}" CanUserAddRows="False">
                             <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Select" Width="60">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox HorizontalAlignment="Center"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="220"/>
                                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
                                 <DataGridTextColumn Header="Progress %" Binding="{Binding ProgressPercent, StringFormat={}{0:0.#}}" Width="96"/>
@@ -149,9 +174,9 @@
                                 <DataGridTemplateColumn Header="" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource SecondaryButton}" Content="{Binding CancelActionText}"
+                                            <Button Style="{StaticResource SecondaryButton}" Content="Cancel"
                                                     Command="{Binding DataContext.Queue.CancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    IsEnabled="{Binding CanCancelOrRetry}"
+                                                    IsEnabled="{Binding CanCancel}"
                                                     CommandParameter="{Binding}" Padding="10,6" MinHeight="32" MinWidth="120"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -168,12 +193,34 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" MinWidth="120" Content="Refresh"
-                            Command="{Binding History.RefreshCommand}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" MinWidth="120" Content="Refresh"
+                                Command="{Binding History.RefreshCommand}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="110"
+                                Content="Select All" Command="{Binding History.SelectAllCommand}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="110"
+                                Content="Clear" Command="{Binding History.ClearSelectionCommand}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
+                                Content="Download Again" Command="{Binding History.RedownloadSelectedCommand}"
+                                IsEnabled="{Binding History.HasSelection}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="90"
+                                Content="Delete" Command="{Binding History.DeleteSelectedCommand}"
+                                IsEnabled="{Binding History.HasSelection}"/>
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource BrushMuted}"
+                                   Text="{Binding History.SelectionSummary}"/>
+                    </StackPanel>
                     <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
                             BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
                         <DataGrid ItemsSource="{Binding History.Items}">
                             <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Select" Width="60">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox HorizontalAlignment="Center"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="260"/>
                                 <DataGridTextColumn Header="Output" Binding="{Binding OutputPath}" Width="*"/>
                                 <DataGridTextColumn Header="OK" Binding="{Binding IsSuccess}" Width="56"/>
