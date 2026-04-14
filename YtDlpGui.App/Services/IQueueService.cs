@@ -9,5 +9,8 @@ public interface IQueueService
     Task LoadPersistedJobsAsync();
     Task PersistAsync();
     Task EnqueueAsync(DownloadJob job);
+    void Pause(Guid id);
+    void Resume(Guid id);
+    void RetryFailed();
     void Cancel(Guid id);
 }

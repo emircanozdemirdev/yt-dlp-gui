@@ -15,6 +15,7 @@ public sealed class QueueService(
     public ObservableCollection<DownloadJob> Jobs { get; } = [];
 
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> runningJobs = new();
+    private readonly ConcurrentDictionary<Guid, byte> pauseRequestedJobs = new();
     private readonly SemaphoreSlim queueSignal = new(0);
     private readonly SemaphoreSlim persistLock = new(1, 1);
     private readonly string queuePath = Path.Combine(
@@ -89,7 +90,7 @@ public sealed class QueueService(
             {
                 foreach (var job in Jobs)
                 {
-                    if (job.Status is DownloadStatus.Pending or DownloadStatus.Running)
+                    if (job.Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused)
                     {
                         snapshot.Add(job);
                     }
@@ -122,8 +123,32 @@ public sealed class QueueService(
 
     public void Cancel(Guid id)
     {
+        pauseRequestedJobs.TryRemove(id, out _);
+
         if (runningJobs.TryGetValue(id, out var cts))
         {
+            cts.Cancel();
+            return;
+        }
+
+        var queued = Jobs.FirstOrDefault(x =>
+            x.Id == id &&
+            (x.Status == DownloadStatus.Pending || x.Status == DownloadStatus.Paused));
+        if (queued is not null)
+        {
+            queued.Status = DownloadStatus.Canceled;
+            queued.Message = "Download canceled.";
+            queued.SpeedText = "-";
+            queued.EtaText = "-";
+            _ = PersistAsync();
+        }
+    }
+
+    public void Pause(Guid id)
+    {
+        if (runningJobs.TryGetValue(id, out var cts))
+        {
+            pauseRequestedJobs[id] = 1;
             cts.Cancel();
             return;
         }
@@ -131,10 +156,53 @@ public sealed class QueueService(
         var pending = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Pending);
         if (pending is not null)
         {
-            pending.Status = DownloadStatus.Canceled;
-            pending.Message = "Download canceled.";
+            pending.Status = DownloadStatus.Paused;
+            pending.Message = "Download paused.";
             _ = PersistAsync();
         }
+    }
+
+    public void Resume(Guid id)
+    {
+        pauseRequestedJobs.TryRemove(id, out _);
+
+        var paused = Jobs.FirstOrDefault(x => x.Id == id && x.Status == DownloadStatus.Paused);
+        if (paused is null)
+        {
+            return;
+        }
+
+        paused.Status = DownloadStatus.Pending;
+        paused.Message = "Resumed and queued.";
+        _ = PersistAsync();
+        queueSignal.Release();
+    }
+
+    public void RetryFailed()
+    {
+        var hasRetriedAny = false;
+        foreach (var job in Jobs)
+        {
+            if (job.Status != DownloadStatus.Failed)
+            {
+                continue;
+            }
+
+            hasRetriedAny = true;
+            job.Status = DownloadStatus.Pending;
+            job.ProgressPercent = 0;
+            job.SpeedText = "-";
+            job.EtaText = "-";
+            job.Message = "Retry queued.";
+        }
+
+        if (!hasRetriedAny)
+        {
+            return;
+        }
+
+        _ = PersistAsync();
+        queueSignal.Release();
     }
 
     private async Task ProcessLoopAsync()
@@ -153,10 +221,12 @@ public sealed class QueueService(
                     break;
                 }
 
+                var cts = new CancellationTokenSource();
+                runningJobs[job.Id] = cts;
                 Interlocked.Increment(ref currentRunningCount);
                 _ = Task.Run(async () =>
                 {
-                    await RunJobAsync(job);
+                    await RunJobAsync(job, cts);
                     Interlocked.Decrement(ref currentRunningCount);
                     await PersistAsync();
                     queueSignal.Release();
@@ -165,17 +235,19 @@ public sealed class QueueService(
         }
     }
 
-    private async Task RunJobAsync(DownloadJob job)
+    private async Task RunJobAsync(DownloadJob job, CancellationTokenSource cts)
     {
-        var cts = new CancellationTokenSource();
-        runningJobs[job.Id] = cts;
-
         try
         {
             job.Status = DownloadStatus.Running;
             var settings = await settingsService.LoadAsync();
             var progress = new Progress<ProgressUpdate>(update =>
             {
+                if (cts.IsCancellationRequested || job.Status != DownloadStatus.Running)
+                {
+                    return;
+                }
+
                 if (update.Percent is not null)
                 {
                     job.ProgressPercent = update.Percent.Value;
@@ -208,6 +280,11 @@ public sealed class QueueService(
                 }
                 catch (Exception ex)
                 {
+                    if (cts.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException(cts.Token);
+                    }
+
                     lastException = ex;
                     job.Message = $"Attempt {attempt}/{attemptCount} failed: {ex.Message}";
                     await Task.Delay(1000, cts.Token);
@@ -233,8 +310,20 @@ public sealed class QueueService(
         }
         catch (OperationCanceledException)
         {
-            job.Status = DownloadStatus.Canceled;
-            job.Message = "Download canceled.";
+            if (pauseRequestedJobs.TryRemove(job.Id, out _))
+            {
+                job.Status = DownloadStatus.Paused;
+                job.Message = "Download paused.";
+                job.SpeedText = "-";
+                job.EtaText = "-";
+            }
+            else
+            {
+                job.Status = DownloadStatus.Canceled;
+                job.Message = "Download canceled.";
+                job.SpeedText = "-";
+                job.EtaText = "-";
+            }
         }
         catch (Exception ex)
         {
@@ -253,6 +342,7 @@ public sealed class QueueService(
         finally
         {
             runningJobs.TryRemove(job.Id, out _);
+            pauseRequestedJobs.TryRemove(job.Id, out _);
         }
     }
 }

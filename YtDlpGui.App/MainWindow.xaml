@@ -119,28 +119,45 @@
             </TabItem>
 
             <TabItem Header="Queue">
-                <Border Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
-                        BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
-                    <DataGrid ItemsSource="{Binding Queue.Jobs}" CanUserAddRows="False">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="220"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
-                            <DataGridTextColumn Header="Progress %" Binding="{Binding ProgressPercent, StringFormat={}{0:0.#}}" Width="96"/>
-                            <DataGridTextColumn Header="Speed" Binding="{Binding SpeedText}" Width="100"/>
-                            <DataGridTextColumn Header="ETA" Binding="{Binding EtaText}" Width="88"/>
-                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
-                            <DataGridTemplateColumn Header="" Width="108">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Button Style="{StaticResource SecondaryButton}" Content="Cancel"
-                                                Command="{Binding DataContext.Queue.CancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}" Padding="12,6" MinHeight="32"/>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" MinWidth="140"
+                            Content="Retry Failed" Command="{Binding Queue.RetryFailedCommand}"/>
+                    <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
+                            BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
+                        <DataGrid ItemsSource="{Binding Queue.Jobs}" CanUserAddRows="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="220"/>
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                                <DataGridTextColumn Header="Progress %" Binding="{Binding ProgressPercent, StringFormat={}{0:0.#}}" Width="96"/>
+                                <DataGridTextColumn Header="Speed" Binding="{Binding SpeedText}" Width="100"/>
+                                <DataGridTextColumn Header="ETA" Binding="{Binding EtaText}" Width="88"/>
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                                <DataGridTemplateColumn Header="" Width="108">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButton}" Content="Pause/Resume"
+                                                    Command="{Binding DataContext.Queue.PauseResumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}" Padding="8,6" MinHeight="32"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButton}" Content="Cancel"
+                                                    Command="{Binding DataContext.Queue.CancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}" Padding="12,6" MinHeight="32"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
             </TabItem>
 
             <TabItem Header="History">

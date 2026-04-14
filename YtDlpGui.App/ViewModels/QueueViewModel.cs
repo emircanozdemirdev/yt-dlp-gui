@@ -28,4 +28,30 @@ public partial class QueueViewModel : ObservableObject
 
         queueService.Cancel(job.Id);
     }
+
+    [RelayCommand]
+    private void PauseResume(DownloadJob? job)
+    {
+        if (job is null)
+        {
+            return;
+        }
+
+        if (job.Status is DownloadStatus.Pending or DownloadStatus.Running)
+        {
+            queueService.Pause(job.Id);
+            return;
+        }
+
+        if (job.Status == DownloadStatus.Paused)
+        {
+            queueService.Resume(job.Id);
+        }
+    }
+
+    [RelayCommand]
+    private void RetryFailed()
+    {
+        queueService.RetryFailed();
+    }
 }
