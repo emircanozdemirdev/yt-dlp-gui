@@ -11,5 +11,6 @@ public sealed class AppSettings
     public int Retries { get; set; } = 3;
     public string? Proxy { get; set; }
     public int? RateLimitKbps { get; set; }
+    public bool DeleteTempFilesOnCancel { get; set; } = true;
     public AppTheme Theme { get; set; } = AppTheme.Dark;
 }

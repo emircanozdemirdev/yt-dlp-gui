@@ -33,7 +33,6 @@
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -191,6 +190,7 @@
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal">
@@ -202,6 +202,9 @@
                                 Content="Clear" Command="{Binding History.ClearSelectionCommand}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
                                 Content="Download Again" Command="{Binding History.RedownloadSelectedCommand}"
+                                IsEnabled="{Binding History.HasSelection}"/>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="130"
+                                Content="Open Folder" Command="{Binding History.OpenSelectedFolderCommand}"
                                 IsEnabled="{Binding History.HasSelection}"/>
                         <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" HorizontalAlignment="Left" MinWidth="90"
                                 Content="Delete" Command="{Binding History.DeleteSelectedCommand}"
@@ -249,6 +252,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Output folder"
@@ -288,7 +292,12 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
 
-                            <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal">
+                            <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Delete temp files on cancel"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <CheckBox Grid.Row="6" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
+                                      IsChecked="{Binding Settings.Current.DeleteTempFilesOnCancel, Mode=TwoWay}"/>
+
+                            <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Style="{StaticResource SecondaryButton}" MinWidth="120" Content="Save"
                                         Command="{Binding Settings.SaveCommand}"/>
                                 <TextBlock Margin="14,0,0,0" VerticalAlignment="Center"

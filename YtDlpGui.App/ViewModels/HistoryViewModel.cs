@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YtDlpGui.App.Models;
@@ -8,12 +8,19 @@ using YtDlpGui.App.Services;
 
 namespace YtDlpGui.App.ViewModels;
 
-public partial class HistoryViewModel(
-    IHistoryService historyService,
-    IQueueService queueService) : ObservableObject
+public partial class HistoryViewModel : ObservableObject
 {
+    private readonly IHistoryService historyService;
+    private readonly IQueueService queueService;
+
     [ObservableProperty]
     private int selectedCount;
+
+    public HistoryViewModel(IHistoryService historyService, IQueueService queueService)
+    {
+        this.historyService = historyService;
+        this.queueService = queueService;
+    }
 
     public ObservableCollection<DownloadHistoryItem> Items { get; } = [];
     public bool HasSelection => SelectedCount > 0;
@@ -118,6 +125,36 @@ public partial class HistoryViewModel(
         }
 
         RecalculateSelectionState();
+    }
+
+    [RelayCommand]
+    private void OpenSelectedFolder()
+    {
+        var selected = Items.FirstOrDefault(x => x.IsSelected);
+        if (selected is null)
+        {
+            return;
+        }
+
+        var outputPath = selected.OutputPath?.Trim();
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            return;
+        }
+
+        var folderPath = Directory.Exists(outputPath)
+            ? outputPath
+            : Path.GetDirectoryName(outputPath);
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = folderPath,
+            UseShellExecute = true
+        });
     }
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)

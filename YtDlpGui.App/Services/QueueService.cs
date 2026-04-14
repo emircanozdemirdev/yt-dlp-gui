@@ -24,6 +24,7 @@ public sealed class QueueService(
         "queue.json");
     private bool isProcessorStarted;
     private int currentRunningCount;
+    private volatile bool deleteTempFilesOnCancel = true;
 
     public async Task LoadPersistedJobsAsync()
     {
@@ -155,7 +156,10 @@ public sealed class QueueService(
         if (queued is not null)
         {
             MarkCanceledAndLog(queued);
-            CleanupCanceledArtifacts(queued);
+            if (deleteTempFilesOnCancel)
+            {
+                _ = Task.Run(() => CleanupCanceledArtifacts(queued));
+            }
             Application.Current.Dispatcher.Invoke(() => Jobs.Remove(queued));
             _ = PersistAsync();
         }
@@ -270,6 +274,7 @@ public sealed class QueueService(
         {
             await queueSignal.WaitAsync();
             var settings = await settingsService.LoadAsync();
+            deleteTempFilesOnCancel = settings.DeleteTempFilesOnCancel;
             var maxParallel = Math.Max(1, settings.MaxParallelDownloads);
 
             while (currentRunningCount < maxParallel)
@@ -309,6 +314,8 @@ public sealed class QueueService(
             }
             Directory.CreateDirectory(job.TemporaryDirectory);
             var settings = await settingsService.LoadAsync();
+            deleteTempFilesOnCancel = settings.DeleteTempFilesOnCancel;
+            var maxObservedPercent = Math.Clamp(job.ProgressPercent, 0, 100);
             var progress = new Progress<ProgressUpdate>(update =>
             {
                 if (cts.IsCancellationRequested || job.Status != DownloadStatus.Running)
@@ -318,7 +325,8 @@ public sealed class QueueService(
 
                 if (update.Percent is not null)
                 {
-                    job.ProgressPercent = update.Percent.Value;
+                    maxObservedPercent = Math.Max(maxObservedPercent, update.Percent.Value);
+                    job.ProgressPercent = maxObservedPercent;
                 }
 
                 if (!string.IsNullOrWhiteSpace(update.Speed))
@@ -366,6 +374,7 @@ public sealed class QueueService(
 
             job.Status = DownloadStatus.Completed;
             job.ResumePartialDownload = false;
+            job.ProgressPercent = 100;
             job.Message = "Download completed.";
 
             await historyService.AddAsync(new DownloadHistoryItem
@@ -390,7 +399,10 @@ public sealed class QueueService(
             else
             {
                 MarkCanceledAndLog(job);
-                CleanupCanceledArtifacts(job);
+                if (deleteTempFilesOnCancel)
+                {
+                    CleanupCanceledArtifacts(job);
+                }
                 Application.Current.Dispatcher.Invoke(() => Jobs.Remove(job));
             }
         }
