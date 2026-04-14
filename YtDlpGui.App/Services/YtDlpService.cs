@@ -146,9 +146,10 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
     {
         Directory.CreateDirectory(job.OutputDirectory);
         var formatArg = string.IsNullOrWhiteSpace(job.SelectedFormatId) ? "best" : job.SelectedFormatId;
+        var continueArg = job.ResumePartialDownload ? "--continue " : "--no-continue ";
 
         var args =
-            $"-f \"{formatArg}\" --newline --retries {settings.Retries} " +
+            $"-f \"{formatArg}\" --newline --retries {settings.Retries} {continueArg}" +
             $"{(string.IsNullOrWhiteSpace(settings.Proxy) ? string.Empty : $"--proxy \"{settings.Proxy}\" ")}" +
             $"{(settings.RateLimitKbps is null ? string.Empty : $"--limit-rate {settings.RateLimitKbps}K ")}" +
             $"--ffmpeg-location \"{settings.FfmpegPath}\" " +
@@ -160,13 +161,18 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             args,
             line =>
             {
+                CaptureOutputPath(job, line);
                 var parsed = progressParser.Parse(line);
                 if (parsed is not null)
                 {
                     progress.Report(parsed);
                 }
             },
-            line => job.Message = line,
+            line =>
+            {
+                CaptureOutputPath(job, line);
+                job.Message = line;
+            },
             cancellationToken);
 
         if (exitCode != 0)
@@ -174,6 +180,27 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(job.Message)
                 ? "Download failed."
                 : job.Message);
+        }
+    }
+
+    private static void CaptureOutputPath(DownloadJob job, string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        const string destinationPrefix = "[download] Destination: ";
+        if (line.StartsWith(destinationPrefix, StringComparison.Ordinal))
+        {
+            job.OutputFilePath = line[destinationPrefix.Length..].Trim().Trim('"');
+            return;
+        }
+
+        const string mergePrefix = "[Merger] Merging formats into ";
+        if (line.StartsWith(mergePrefix, StringComparison.Ordinal))
+        {
+            job.OutputFilePath = line[mergePrefix.Length..].Trim().Trim('"');
         }
     }
 }

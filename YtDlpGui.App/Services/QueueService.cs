@@ -55,6 +55,7 @@ public sealed class QueueService(
                 if (job.Status is DownloadStatus.Pending or DownloadStatus.Running)
                 {
                     job.Status = DownloadStatus.Pending;
+                    job.ResumePartialDownload = true;
                     job.SpeedText = "-";
                     job.EtaText = "-";
                     job.Message = "Restored from previous session.";
@@ -137,9 +138,11 @@ public sealed class QueueService(
         if (queued is not null)
         {
             queued.Status = DownloadStatus.Canceled;
+            queued.ResumePartialDownload = false;
             queued.Message = "Download canceled.";
             queued.SpeedText = "-";
             queued.EtaText = "-";
+            CleanupCanceledArtifacts(queued);
             _ = PersistAsync();
         }
     }
@@ -173,6 +176,7 @@ public sealed class QueueService(
         }
 
         paused.Status = DownloadStatus.Pending;
+        paused.ResumePartialDownload = true;
         paused.Message = "Resumed and queued.";
         _ = PersistAsync();
         queueSignal.Release();
@@ -190,6 +194,7 @@ public sealed class QueueService(
 
             hasRetriedAny = true;
             job.Status = DownloadStatus.Pending;
+            job.ResumePartialDownload = false;
             job.ProgressPercent = 0;
             job.SpeedText = "-";
             job.EtaText = "-";
@@ -297,6 +302,7 @@ public sealed class QueueService(
             }
 
             job.Status = DownloadStatus.Completed;
+            job.ResumePartialDownload = false;
             job.Message = "Download completed.";
 
             await historyService.AddAsync(new DownloadHistoryItem
@@ -313,6 +319,7 @@ public sealed class QueueService(
             if (pauseRequestedJobs.TryRemove(job.Id, out _))
             {
                 job.Status = DownloadStatus.Paused;
+                job.ResumePartialDownload = true;
                 job.Message = "Download paused.";
                 job.SpeedText = "-";
                 job.EtaText = "-";
@@ -320,14 +327,17 @@ public sealed class QueueService(
             else
             {
                 job.Status = DownloadStatus.Canceled;
+                job.ResumePartialDownload = false;
                 job.Message = "Download canceled.";
                 job.SpeedText = "-";
                 job.EtaText = "-";
+                CleanupCanceledArtifacts(job);
             }
         }
         catch (Exception ex)
         {
             job.Status = DownloadStatus.Failed;
+            job.ResumePartialDownload = false;
             job.Message = ex.Message;
 
             await historyService.AddAsync(new DownloadHistoryItem
@@ -343,6 +353,54 @@ public sealed class QueueService(
         {
             runningJobs.TryRemove(job.Id, out _);
             pauseRequestedJobs.TryRemove(job.Id, out _);
+        }
+    }
+
+    private static void CleanupCanceledArtifacts(DownloadJob job)
+    {
+        if (string.IsNullOrWhiteSpace(job.OutputFilePath))
+        {
+            return;
+        }
+
+        var resolvedPath = job.OutputFilePath.Trim();
+        var directory = Path.GetDirectoryName(resolvedPath);
+        var fileName = Path.GetFileName(resolvedPath);
+        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName) || !Directory.Exists(directory))
+        {
+            return;
+        }
+
+        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            resolvedPath,
+            $"{resolvedPath}.part",
+            $"{resolvedPath}.ytdl"
+        };
+
+        var searchPattern = $"{fileName}*";
+        foreach (var path in Directory.EnumerateFiles(directory, searchPattern))
+        {
+            if (path.EndsWith(".part", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".ytdl", StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add(path);
+            }
+        }
+
+        foreach (var path in candidates)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+                // Best-effort cleanup.
+            }
         }
     }
 }

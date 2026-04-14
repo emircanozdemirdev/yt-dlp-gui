@@ -36,4 +36,10 @@ public partial class DownloadJob : ObservableObject
 
     [ObservableProperty]
     private DateTimeOffset createdAtUtc = DateTimeOffset.UtcNow;
+
+    [ObservableProperty]
+    private bool resumePartialDownload;
+
+    [ObservableProperty]
+    private string? outputFilePath;
 }
