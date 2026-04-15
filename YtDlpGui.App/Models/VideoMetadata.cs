@@ -6,5 +6,7 @@ public sealed class VideoMetadata
     public string Title { get; init; } = string.Empty;
     public string Uploader { get; init; } = string.Empty;
     public TimeSpan? Duration { get; init; }
+    public bool IsPlaylist { get; init; }
+    public int PlaylistItemCount { get; init; }
     public IReadOnlyList<FormatOption> Formats { get; init; } = [];
 }

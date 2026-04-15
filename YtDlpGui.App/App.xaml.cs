@@ -21,7 +21,15 @@ public partial class App : Application
             var settingsService = new SettingsService();
             var historyService = new HistoryService();
             var uiDispatcher = new WpfUiDispatcher();
-            queueService = new QueueService(ytDlpService, settingsService, historyService, uiDispatcher);
+            var userPromptService = new DesktopUserPromptService();
+            var notificationService = new DesktopNotificationService();
+            queueService = new QueueService(
+                ytDlpService,
+                settingsService,
+                historyService,
+                uiDispatcher,
+                userPromptService,
+                notificationService);
             var themeService = new ThemeService();
             var settings = await settingsService.LoadAsync();
             themeService.Apply(settings.Theme);

@@ -20,6 +20,7 @@ public partial class QuickDownloadViewModel : ObservableObject
         this.ytDlpService = ytDlpService;
         this.queueService = queueService;
         this.settingsViewModel = settingsViewModel;
+        InitializeProfiles();
     }
 
     [ObservableProperty]
@@ -44,10 +45,20 @@ public partial class QuickDownloadViewModel : ObservableObject
     private FormatOption? selectedFormat;
 
     [ObservableProperty]
-    private string quickPreset = "Best";
+    private DownloadProfile? selectedProfile;
 
     public ObservableCollection<FormatOption> Formats { get; } = [];
-    public IReadOnlyList<string> Presets { get; } = ["Best", "1080p", "Audio Only"];
+    public ObservableCollection<DownloadProfile> Profiles { get; } = [];
+
+    partial void OnSelectedProfileChanged(DownloadProfile? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        settingsViewModel.Current.SelectedProfileId = value.Id;
+    }
 
     [RelayCommand]
     private async Task AnalyzeAsync()
@@ -66,6 +77,10 @@ public partial class QuickDownloadViewModel : ObservableObject
             Title = metadata.Title;
             Uploader = metadata.Uploader;
             Duration = metadata.Duration?.ToString(@"hh\:mm\:ss") ?? "-";
+            if (metadata.IsPlaylist)
+            {
+                StatusMessage = "Playlist URL detected. Use the Playlist tab for better control.";
+            }
 
             Formats.Clear();
             foreach (var format in FormatListSorter.OrderHighToLow(metadata.Formats))
@@ -74,6 +89,7 @@ public partial class QuickDownloadViewModel : ObservableObject
             }
 
             SelectedFormat = Formats.FirstOrDefault();
+            InitializeProfiles();
             StatusMessage = $"Found {Formats.Count} formats.";
         }
         catch (Exception ex)
@@ -89,6 +105,8 @@ public partial class QuickDownloadViewModel : ObservableObject
     [RelayCommand]
     private async Task EnqueueDownloadAsync()
     {
+        InitializeProfiles();
+
         if (string.IsNullOrWhiteSpace(Url))
         {
             StatusMessage = "URL is required.";
@@ -98,7 +116,7 @@ public partial class QuickDownloadViewModel : ObservableObject
         var formatId = SelectedFormat?.FormatId;
         if (string.IsNullOrWhiteSpace(formatId))
         {
-            formatId = GetPresetFormat(QuickPreset);
+            formatId = SelectedProfile?.FormatSelector ?? "best";
         }
 
         var job = new DownloadJob
@@ -106,18 +124,31 @@ public partial class QuickDownloadViewModel : ObservableObject
             Url = Url.Trim(),
             Title = Title,
             OutputDirectory = settingsViewModel.Current.OutputDirectory,
-            SelectedFormatId = formatId
+            SelectedFormatId = formatId,
+            IsPlaylist = false,
+            UseDownloadArchive = SelectedProfile?.UseDownloadArchive ?? false
         };
 
-        await queueService.EnqueueAsync(job);
-        StatusMessage = "Added to queue.";
+        var result = await queueService.EnqueueAsync(job);
+        StatusMessage = result.Message;
     }
 
-    private static string GetPresetFormat(string preset) =>
-        preset switch
+    private void InitializeProfiles()
+    {
+        var selectedId = SelectedProfile?.Id ?? settingsViewModel.Current.SelectedProfileId;
+        Profiles.Clear();
+        foreach (var profile in settingsViewModel.Current.DownloadProfiles)
         {
-            "1080p" => "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "Audio Only" => "bestaudio",
-            _ => "best"
-        };
+            Profiles.Add(profile);
+        }
+
+        SelectedProfile =
+            Profiles.FirstOrDefault(x => string.Equals(x.Id, selectedId, StringComparison.OrdinalIgnoreCase)) ??
+            Profiles.FirstOrDefault();
+    }
+
+    public void RefreshProfilesFromSettings()
+    {
+        InitializeProfiles();
+    }
 }

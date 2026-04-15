@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using YtDlpGui.App.Infrastructure;
@@ -8,12 +9,17 @@ namespace YtDlpGui.App.Services;
 
 public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser progressParser) : IYtDlpService
 {
+    private static readonly Regex PlaylistItemRegex = new(
+        @"Downloading item (?<index>\d+) of (?<total>\d+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     public async Task<VideoMetadata> AnalyzeAsync(string url, AppSettings settings, CancellationToken cancellationToken)
     {
         var outputBuilder = new StringBuilder();
         var errorBuilder = new StringBuilder();
 
-        var args = $"-J --no-playlist \"{url}\"";
+        var playlistArg = settings.EnablePlaylistDownload ? string.Empty : "--no-playlist ";
+        var args = $"-J {playlistArg}\"{url}\"";
         var exitCode = await processRunner.RunAsync(
             settings.YtDlpPath,
             args,
@@ -93,12 +99,23 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             }
 
             var durationSeconds = YtDlpJsonReader.GetDouble(root, "duration");
+            var isPlaylist = string.Equals(
+                YtDlpJsonReader.GetString(root, "_type", string.Empty),
+                "playlist",
+                StringComparison.OrdinalIgnoreCase);
+            var playlistItemCount = 0;
+            if (root.TryGetProperty("entries", out var entries) && entries.ValueKind == JsonValueKind.Array)
+            {
+                playlistItemCount = entries.GetArrayLength();
+            }
             return new VideoMetadata
             {
                 Url = url,
                 Title = YtDlpJsonReader.GetString(root, "title", "Unknown title"),
                 Uploader = YtDlpJsonReader.GetString(root, "uploader", "-"),
                 Duration = durationSeconds is null ? null : TimeSpan.FromSeconds(durationSeconds.Value),
+                IsPlaylist = isPlaylist,
+                PlaylistItemCount = playlistItemCount,
                 Formats = formats
             };
         }
@@ -156,12 +173,19 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
         Directory.CreateDirectory(job.TemporaryDirectory);
         var formatArg = string.IsNullOrWhiteSpace(job.SelectedFormatId) ? "best" : job.SelectedFormatId;
         var continueArg = job.ResumePartialDownload ? "--continue " : "--no-continue ";
+        var playlistArg = job.IsPlaylist ? "--yes-playlist " : "--no-playlist ";
+        var rateLimit = job.EffectiveRateLimitKbps ?? settings.RateLimitKbps;
+        var archiveArg = job.UseDownloadArchive
+            ? $"--download-archive \"{settings.DownloadArchivePath}\" "
+            : string.Empty;
 
         var args =
             $"-f \"{formatArg}\" --newline --retries {settings.Retries} {continueArg}" +
+            playlistArg +
+            archiveArg +
             $"--paths \"temp:{job.TemporaryDirectory}\" " +
             $"{(string.IsNullOrWhiteSpace(settings.Proxy) ? string.Empty : $"--proxy \"{settings.Proxy}\" ")}" +
-            $"{(settings.RateLimitKbps is null ? string.Empty : $"--limit-rate {settings.RateLimitKbps}K ")}" +
+            $"{(rateLimit is null ? string.Empty : $"--limit-rate {rateLimit}K ")}" +
             $"--ffmpeg-location \"{settings.FfmpegPath}\" " +
             $"-o \"{Path.Combine(job.OutputDirectory, settings.FileNameTemplate)}\" " +
             $"\"{job.Url}\"";
@@ -181,7 +205,12 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             line =>
             {
                 CaptureOutputPath(job, line);
-                job.Message = line;
+                // Avoid flooding UI bindings with noisy stderr lines.
+                if (!string.IsNullOrWhiteSpace(line) &&
+                    !line.StartsWith("[download]", StringComparison.OrdinalIgnoreCase))
+                {
+                    job.Message = line;
+                }
             },
             cancellationToken);
 
@@ -206,6 +235,14 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             var path = line[destinationPrefix.Length..].Trim().Trim('"');
             job.OutputFilePath = path;
             job.RegisterArtifactPath(path);
+            if (job.IsPlaylist)
+            {
+                var item = Path.GetFileName(path);
+                if (!string.Equals(job.CurrentPlaylistItem, item, StringComparison.Ordinal))
+                {
+                    job.CurrentPlaylistItem = item;
+                }
+            }
             return;
         }
 
@@ -215,6 +252,34 @@ public sealed class YtDlpService(IProcessRunner processRunner, ProgressParser pr
             var path = line[mergePrefix.Length..].Trim().Trim('"');
             job.OutputFilePath = path;
             job.RegisterArtifactPath(path);
+            if (job.IsPlaylist)
+            {
+                var item = Path.GetFileName(path);
+                if (!string.Equals(job.CurrentPlaylistItem, item, StringComparison.Ordinal))
+                {
+                    job.CurrentPlaylistItem = item;
+                }
+            }
+            return;
+        }
+
+        if (job.IsPlaylist)
+        {
+            var match = PlaylistItemRegex.Match(line);
+            if (match.Success)
+            {
+                var index = match.Groups["index"].Value;
+                var total = match.Groups["total"].Value;
+                if (int.TryParse(index, out var currentIndex))
+                {
+                    job.CurrentPlaylistIndex = currentIndex;
+                }
+
+                if (int.TryParse(total, out var totalCount))
+                {
+                    job.PlaylistItemCount = totalCount;
+                }
+            }
         }
     }
 }

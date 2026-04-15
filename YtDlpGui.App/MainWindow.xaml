@@ -82,26 +82,27 @@
                                        Foreground="{DynamicResource BrushText}" Margin="0,0,0,8"/>
 
                             <DataGrid Grid.Row="1" MinHeight="220"
+                                      IsReadOnly="True"
                                       ItemsSource="{Binding QuickDownload.Formats}"
                                       SelectedItem="{Binding QuickDownload.SelectedFormat}">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Type" Binding="{Binding MediaKind}" Width="72"/>
-                                    <DataGridTextColumn Header="Format" Binding="{Binding FormatId}" Width="88"/>
-                                    <DataGridTextColumn Header="Ext" Binding="{Binding Extension}" Width="56"/>
-                                    <DataGridTextColumn Header="Resolution" Binding="{Binding Resolution}" Width="120"/>
-                                    <DataGridTextColumn Header="Codec" Binding="{Binding Codec}" Width="*"/>
-                                    <DataGridTextColumn Header="Bitrate" Binding="{Binding Bitrate}" Width="88"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding MediaKind, Mode=OneWay}" Width="72"/>
+                                    <DataGridTextColumn Header="Format" Binding="{Binding FormatId, Mode=OneWay}" Width="88"/>
+                                    <DataGridTextColumn Header="Ext" Binding="{Binding Extension, Mode=OneWay}" Width="56"/>
+                                    <DataGridTextColumn Header="Resolution" Binding="{Binding Resolution, Mode=OneWay}" Width="120"/>
+                                    <DataGridTextColumn Header="Codec" Binding="{Binding Codec, Mode=OneWay}" Width="*"/>
+                                    <DataGridTextColumn Header="Bitrate" Binding="{Binding Bitrate, Mode=OneWay}" Width="88"/>
                                 </DataGrid.Columns>
                             </DataGrid>
 
                             <StackPanel Grid.Row="2" Margin="0,14,0,0" Orientation="Horizontal">
-                                <TextBlock VerticalAlignment="Center" Text="Preset" Foreground="{DynamicResource BrushMuted}"/>
+                                <TextBlock VerticalAlignment="Center" Text="Profile" Foreground="{DynamicResource BrushMuted}"/>
                                 <ComboBox Width="200" Margin="10,0,0,0"
-                                          ItemsSource="{Binding QuickDownload.Presets}"
-                                          SelectedItem="{Binding QuickDownload.QuickPreset}">
+                                          ItemsSource="{Binding QuickDownload.Profiles}"
+                                          SelectedItem="{Binding QuickDownload.SelectedProfile}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource BrushText}"/>
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource BrushText}"/>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
@@ -112,6 +113,64 @@
                             <TextBlock Grid.Row="3" Margin="0,10,0,0" FontStyle="Italic"
                                        Foreground="{DynamicResource BrushMuted}"
                                        Text="{Binding QuickDownload.StatusMessage}" TextWrapping="Wrap"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Playlist Download">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}"
+                            BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Playlist URL" FontWeight="SemiBold" Foreground="{DynamicResource BrushText}"/>
+                            <TextBox Grid.Row="1" Grid.Column="0" Margin="0,8,12,0" MinHeight="40"
+                                     Text="{Binding PlaylistDownload.Url, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Button Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" MinWidth="180" Content="Add Playlist to Queue"
+                                    Command="{Binding PlaylistDownload.EnqueuePlaylistCommand}"/>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}" BorderBrush="{DynamicResource BrushBorder}"
+                            BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Quality Preset" Foreground="{DynamicResource BrushMuted}"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,0"
+                                      ItemsSource="{Binding PlaylistDownload.QualityPresets}"
+                                      SelectedItem="{Binding PlaylistDownload.SelectedQualityPreset}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource BrushText}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0" FontStyle="Italic"
+                                       Foreground="{DynamicResource BrushMuted}"
+                                       Text="{Binding PlaylistDownload.StatusMessage}" TextWrapping="Wrap"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -144,7 +203,17 @@
                     </StackPanel>
                     <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
                             BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
-                        <DataGrid ItemsSource="{Binding Queue.Jobs}" CanUserAddRows="False">
+                        <DataGrid ItemsSource="{Binding Queue.Jobs}" CanUserAddRows="False" IsReadOnly="True">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="MinHeight" Value="34"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                            <Setter Property="MinHeight" Value="86"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Select" Width="60">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -154,16 +223,63 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="220"/>
-                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
-                                <DataGridTextColumn Header="Progress %" Binding="{Binding ProgressPercent, StringFormat={}{0:0.#}}" Width="96"/>
-                                <DataGridTextColumn Header="Speed" Binding="{Binding SpeedText}" Width="100"/>
-                                <DataGridTextColumn Header="ETA" Binding="{Binding EtaText}" Width="88"/>
-                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                                <DataGridTemplateColumn Header="Type" Width="72">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock HorizontalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="Single"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPlaylist}" Value="True">
+                                                                <Setter Property="Text" Value="Playlist"/>
+                                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Title / Details" Width="320">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource BrushMuted}" TextWrapping="Wrap">
+                                                    <Run Text="Playlist progress:"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding PlaylistProgressText, Mode=OneWay}"/>
+                                                </TextBlock>
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource BrushMuted}" Margin="0,2,0,0">
+                                                    <Run Text="Current item:"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding CurrentPlaylistItem, Mode=OneWay}"/>
+                                                </TextBlock>
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource BrushMuted}" Margin="0,2,0,0">
+                                                    <Run Text="Item progress:"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding CurrentItemProgressPercent, Mode=OneWay, StringFormat={}{0:0.#}%}"/>
+                                                    <Run Text=" | Speed: "/>
+                                                    <Run Text="{Binding SpeedText, Mode=OneWay}"/>
+                                                    <Run Text=" | ETA: "/>
+                                                    <Run Text="{Binding EtaText, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status, Mode=OneWay}" Width="100"/>
+                                <DataGridTextColumn Header="List Progress" Binding="{Binding ListProgressDisplay, Mode=OneWay}" Width="98"/>
+                                <DataGridTextColumn Header="Item %" Binding="{Binding ActiveItemProgressPercent, Mode=OneWay, StringFormat={}{0:0.#}%}" Width="86"/>
+                                <DataGridTextColumn Header="Speed" Binding="{Binding SpeedText, Mode=OneWay}" Width="96"/>
+                                <DataGridTextColumn Header="ETA" Binding="{Binding EtaText, Mode=OneWay}" Width="84"/>
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message, Mode=OneWay}" Width="220"/>
                                 <DataGridTemplateColumn Header="" Width="108">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource SecondaryButton}" Content="{Binding PauseResumeActionText}"
+                                            <Button Style="{StaticResource SecondaryButton}" Content="{Binding PauseResumeActionText, Mode=OneWay}"
                                                     Command="{Binding DataContext.Queue.PauseResumeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     IsEnabled="{Binding CanPauseResume}"
                                                     CommandParameter="{Binding}" Padding="8,6" MinHeight="32"/>
@@ -214,7 +330,7 @@
                     </StackPanel>
                     <Border Grid.Row="1" Margin="0,12,0,0" Background="{DynamicResource BrushSurface}"
                             BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12">
-                        <DataGrid ItemsSource="{Binding History.Items}">
+                        <DataGrid ItemsSource="{Binding History.Items}" IsReadOnly="True">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Select" Width="60">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -224,11 +340,11 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="260"/>
-                                <DataGridTextColumn Header="Output" Binding="{Binding OutputPath}" Width="*"/>
-                                <DataGridTextColumn Header="OK" Binding="{Binding IsSuccess}" Width="56"/>
-                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="200"/>
-                                <DataGridTextColumn Header="When (UTC)" Binding="{Binding CompletedAtUtc}" Width="168"/>
+                                <DataGridTextColumn Header="Title" Binding="{Binding Title, Mode=OneWay}" Width="260"/>
+                                <DataGridTextColumn Header="Output" Binding="{Binding OutputPath, Mode=OneWay}" Width="*"/>
+                                <DataGridTextColumn Header="OK" Binding="{Binding IsSuccess, Mode=OneWay}" Width="56"/>
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message, Mode=OneWay}" Width="200"/>
+                                <DataGridTextColumn Header="When (UTC)" Binding="{Binding CompletedAtUtc, Mode=OneWay}" Width="168"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Border>
@@ -245,6 +361,14 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -297,7 +421,48 @@
                             <CheckBox Grid.Row="6" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
                                       IsChecked="{Binding Settings.Current.DeleteTempFilesOnCancel, Mode=TwoWay}"/>
 
-                            <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal">
+                            <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Bandwidth schedule enabled"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <CheckBox Grid.Row="7" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
+                                      IsChecked="{Binding Settings.Current.BandwidthScheduleEnabled, Mode=TwoWay}"/>
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="Bandwidth limit (Kbps)"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <TextBox Grid.Row="8" Grid.Column="1" Margin="12,6,0,6" MinHeight="40"
+                                     Text="{Binding Settings.BandwidthLimitKbpsInput, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="Bandwidth window start"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <TextBox Grid.Row="9" Grid.Column="1" Margin="12,6,0,6" MinHeight="40"
+                                     Text="{Binding Settings.BandwidthWindowStartInput, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Text="Bandwidth window end"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <TextBox Grid.Row="10" Grid.Column="1" Margin="12,6,0,6" MinHeight="40"
+                                     Text="{Binding Settings.BandwidthWindowEndInput, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="11" Grid.Column="0" VerticalAlignment="Center" Text="Duplicate policy"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <ComboBox Grid.Row="11" Grid.Column="1" Margin="12,6,0,6"
+                                      ItemsSource="{Binding Settings.DuplicatePolicyOptions}"
+                                      SelectedItem="{Binding Settings.SelectedDuplicatePolicy, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Grid.Row="12" Grid.Column="0" VerticalAlignment="Center" Text="Enable playlist download"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <CheckBox Grid.Row="12" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
+                                      IsChecked="{Binding Settings.Current.EnablePlaylistDownload, Mode=TwoWay}"/>
+
+                            <TextBlock Grid.Row="13" Grid.Column="0" VerticalAlignment="Center" Text="Notify on completion"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <CheckBox Grid.Row="13" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
+                                      IsChecked="{Binding Settings.Current.NotifyOnCompletion, Mode=TwoWay}"/>
+
+                            <TextBlock Grid.Row="14" Grid.Column="0" VerticalAlignment="Center" Text="Play completion sound"
+                                       Foreground="{DynamicResource BrushMuted}"/>
+                            <CheckBox Grid.Row="14" Grid.Column="1" Margin="12,6,0,6" VerticalAlignment="Center"
+                                      IsChecked="{Binding Settings.Current.PlaySoundOnCompletion, Mode=TwoWay}"/>
+
+                            <StackPanel Grid.Row="15" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal">
                                 <Button Style="{StaticResource SecondaryButton}" MinWidth="120" Content="Save"
                                         Command="{Binding Settings.SaveCommand}"/>
                                 <TextBlock Margin="14,0,0,0" VerticalAlignment="Center"

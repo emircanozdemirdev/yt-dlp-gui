@@ -10,7 +10,9 @@ public sealed class QueueService(
     IYtDlpService ytDlpService,
     ISettingsService settingsService,
     IHistoryService historyService,
-    IUiDispatcher uiDispatcher) : IQueueService
+    IUiDispatcher uiDispatcher,
+    IUserPromptService userPromptService,
+    INotificationService notificationService) : IQueueService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     public ObservableCollection<DownloadJob> Jobs { get; } = [];
@@ -126,8 +128,24 @@ public sealed class QueueService(
         }
     }
 
-    public async Task EnqueueAsync(DownloadJob job)
+    public async Task<EnqueueResult> EnqueueAsync(DownloadJob job)
     {
+        var settings = await settingsService.LoadAsync();
+        var duplicateAction = await ResolveDuplicateActionAsync(job.Url, settings);
+        if (duplicateAction == DuplicatePromptAction.Skip)
+        {
+            return new EnqueueResult
+            {
+                Accepted = false,
+                Message = "Skipped because URL already exists."
+            };
+        }
+
+        if (duplicateAction == DuplicatePromptAction.Replace)
+        {
+            RemoveExistingDuplicates(job.Url);
+        }
+
         uiDispatcher.Invoke(() => Jobs.Add(job));
         await PersistAsync();
         queueSignal.Release();
@@ -138,7 +156,11 @@ public sealed class QueueService(
             _ = Task.Run(ProcessLoopAsync);
         }
 
-        await Task.CompletedTask;
+        return new EnqueueResult
+        {
+            Accepted = true,
+            Message = "Added to queue."
+        };
     }
 
     public void Cancel(Guid id)
@@ -286,6 +308,16 @@ public sealed class QueueService(
                     break;
                 }
 
+                if (!BandwidthWindowEvaluator.IsWithinWindow(settings, DateTime.Now))
+                {
+                    job.Message = "Waiting for allowed time window.";
+                    _ = Task.Delay(TimeSpan.FromSeconds(30))
+                        .ContinueWith(_ => queueSignal.Release(), TaskScheduler.Default);
+                    break;
+                }
+
+                job.EffectiveRateLimitKbps = BandwidthWindowEvaluator.ResolveEffectiveRateLimit(settings);
+
                 var cts = new CancellationTokenSource();
                 runningJobs[job.Id] = cts;
                 Interlocked.Increment(ref currentRunningCount);
@@ -302,6 +334,7 @@ public sealed class QueueService(
 
     private async Task RunJobAsync(DownloadJob job, CancellationTokenSource cts)
     {
+        AppSettings? currentSettings = null;
         try
         {
             job.Status = DownloadStatus.Running;
@@ -314,9 +347,10 @@ public sealed class QueueService(
                     job.Id.ToString("N"));
             }
             Directory.CreateDirectory(job.TemporaryDirectory);
-            var settings = await settingsService.LoadAsync();
-            deleteTempFilesOnCancel = settings.DeleteTempFilesOnCancel;
+            currentSettings = await settingsService.LoadAsync();
+            deleteTempFilesOnCancel = currentSettings.DeleteTempFilesOnCancel;
             var maxObservedPercent = Math.Clamp(job.ProgressPercent, 0, 100);
+            var lastUiUpdateAt = DateTime.UtcNow;
             var progress = new Progress<ProgressUpdate>(update =>
             {
                 if (cts.IsCancellationRequested || job.Status != DownloadStatus.Running)
@@ -324,30 +358,57 @@ public sealed class QueueService(
                     return;
                 }
 
+                var now = DateTime.UtcNow;
+                var shouldUpdateUi = now - lastUiUpdateAt >= TimeSpan.FromMilliseconds(200);
+
                 if (update.Percent is not null)
                 {
-                    maxObservedPercent = Math.Max(maxObservedPercent, update.Percent.Value);
-                    job.ProgressPercent = maxObservedPercent;
+                    if (job.IsPlaylist && job.PlaylistItemCount > 0 && job.CurrentPlaylistIndex > 0)
+                    {
+                        var nextItemProgress = Math.Clamp(update.Percent.Value, 0, 100);
+                        if (Math.Abs(nextItemProgress - job.CurrentItemProgressPercent) >= 0.2 || shouldUpdateUi)
+                        {
+                            job.CurrentItemProgressPercent = nextItemProgress;
+                        }
+
+                        var completedBeforeCurrent = Math.Max(0, job.CurrentPlaylistIndex - 1);
+                        var overallProgress = ((completedBeforeCurrent + (job.CurrentItemProgressPercent / 100.0)) / job.PlaylistItemCount) * 100.0;
+                        maxObservedPercent = Math.Max(maxObservedPercent, overallProgress);
+                    }
+                    else
+                    {
+                        maxObservedPercent = Math.Max(maxObservedPercent, update.Percent.Value);
+                    }
+
+                    if (Math.Abs(maxObservedPercent - job.ProgressPercent) >= 0.1 || shouldUpdateUi)
+                    {
+                        job.ProgressPercent = maxObservedPercent;
+                    }
                 }
 
-                if (!string.IsNullOrWhiteSpace(update.Speed))
+                if (!string.IsNullOrWhiteSpace(update.Speed) && (shouldUpdateUi || update.Speed != job.SpeedText))
                 {
                     job.SpeedText = update.Speed;
                 }
 
-                if (!string.IsNullOrWhiteSpace(update.Eta))
+                if (!string.IsNullOrWhiteSpace(update.Eta) && (shouldUpdateUi || update.Eta != job.EtaText))
                 {
                     job.EtaText = update.Eta;
+                }
+
+                if (shouldUpdateUi)
+                {
+                    lastUiUpdateAt = now;
                 }
             });
 
             Exception? lastException = null;
-            var attemptCount = Math.Max(1, settings.Retries + 1);
+            var attemptCount = Math.Max(1, currentSettings.Retries + 1);
             for (var attempt = 1; attempt <= attemptCount; attempt++)
             {
                 try
                 {
-                    await ytDlpService.DownloadAsync(job, settings, progress, cts.Token);
+                    await ytDlpService.DownloadAsync(job, currentSettings, progress, cts.Token);
                     lastException = null;
                     break;
                 }
@@ -375,6 +436,11 @@ public sealed class QueueService(
 
             job.Status = DownloadStatus.Completed;
             job.ResumePartialDownload = false;
+            job.CurrentItemProgressPercent = 100;
+            if (job.IsPlaylist && job.PlaylistItemCount > 0)
+            {
+                job.CurrentPlaylistIndex = job.PlaylistItemCount;
+            }
             job.ProgressPercent = 100;
             job.Message = "Download completed.";
 
@@ -386,6 +452,7 @@ public sealed class QueueService(
                 IsSuccess = true,
                 Message = "Completed"
             });
+            await NotifyCompletionAsync(currentSettings ?? new AppSettings(), job, isSuccess: true);
         }
         catch (OperationCanceledException)
         {
@@ -421,6 +488,7 @@ public sealed class QueueService(
                 IsSuccess = false,
                 Message = ex.Message
             });
+            await NotifyCompletionAsync(currentSettings ?? new AppSettings(), job, isSuccess: false);
         }
         finally
         {
@@ -516,5 +584,67 @@ public sealed class QueueService(
             IsSuccess = false,
             Message = "Canceled"
         });
+        _ = NotifyCanceledAsync(job);
+    }
+
+    private async Task NotifyCanceledAsync(DownloadJob job)
+    {
+        var settings = await settingsService.LoadAsync();
+        await NotifyCompletionAsync(settings, job, isSuccess: false);
+    }
+
+    private async Task<DuplicatePromptAction> ResolveDuplicateActionAsync(string url, AppSettings settings)
+    {
+        if (settings.DuplicatePolicy == DuplicatePolicy.Allow)
+        {
+            return DuplicatePromptAction.AddAnyway;
+        }
+
+        var hasQueueDuplicate = Jobs.Any(x => string.Equals(x.Url, url, StringComparison.OrdinalIgnoreCase));
+        var history = await historyService.LoadAsync();
+        var hasHistoryDuplicate = history.Any(x => string.Equals(x.Url, url, StringComparison.OrdinalIgnoreCase));
+        var isDuplicate = hasQueueDuplicate || hasHistoryDuplicate;
+        if (!isDuplicate)
+        {
+            return DuplicatePromptAction.AddAnyway;
+        }
+
+        return settings.DuplicatePolicy switch
+        {
+            DuplicatePolicy.Skip => DuplicatePromptAction.Skip,
+            DuplicatePolicy.Replace => DuplicatePromptAction.Replace,
+            DuplicatePolicy.Ask => userPromptService.ResolveDuplicate(url),
+            _ => DuplicatePromptAction.AddAnyway
+        };
+    }
+
+    private void RemoveExistingDuplicates(string url)
+    {
+        var duplicates = Jobs
+            .Where(x =>
+                string.Equals(x.Url, url, StringComparison.OrdinalIgnoreCase) &&
+                x.Status is DownloadStatus.Pending or DownloadStatus.Paused)
+            .ToList();
+
+        foreach (var duplicate in duplicates)
+        {
+            uiDispatcher.Invoke(() => Jobs.Remove(duplicate));
+        }
+    }
+
+    private Task NotifyCompletionAsync(AppSettings settings, DownloadJob job, bool isSuccess)
+    {
+        if (settings.NotifyOnCompletion)
+        {
+            var status = isSuccess ? "Completed" : "Failed";
+            notificationService.Notify("yt-dlp GUI", $"{status}: {job.Title}");
+        }
+
+        if (settings.PlaySoundOnCompletion)
+        {
+            notificationService.PlayCompletionSound();
+        }
+
+        return Task.CompletedTask;
     }
 }

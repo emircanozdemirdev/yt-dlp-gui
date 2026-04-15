@@ -26,8 +26,22 @@ public partial class SettingsViewModel(
     [ObservableProperty]
     private AppTheme selectedTheme = AppTheme.Dark;
 
+    [ObservableProperty]
+    private string bandwidthLimitKbpsInput = string.Empty;
+
+    [ObservableProperty]
+    private string bandwidthWindowStartInput = "23:00";
+
+    [ObservableProperty]
+    private string bandwidthWindowEndInput = "07:00";
+
+    [ObservableProperty]
+    private DuplicatePolicy selectedDuplicatePolicy = DuplicatePolicy.Allow;
+
     public IReadOnlyList<AppTheme> ThemeOptions { get; } =
         [AppTheme.Dark, AppTheme.Light];
+    public IReadOnlyList<DuplicatePolicy> DuplicatePolicyOptions { get; } =
+        [DuplicatePolicy.Allow, DuplicatePolicy.Skip, DuplicatePolicy.Ask, DuplicatePolicy.Replace];
 
     /// <summary>Shows output path with "Users\user" instead of the real account name (two-way binding).</summary>
     public string OutputDirectoryDisplay
@@ -56,6 +70,10 @@ public partial class SettingsViewModel(
         Current = await settingsService.LoadAsync();
         MaxParallelDownloadsInput = Current.MaxParallelDownloads.ToString(CultureInfo.InvariantCulture);
         RetriesInput = Current.Retries.ToString(CultureInfo.InvariantCulture);
+        BandwidthLimitKbpsInput = Current.BandwidthLimitKbps?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        BandwidthWindowStartInput = Current.BandwidthWindowStart;
+        BandwidthWindowEndInput = Current.BandwidthWindowEnd;
+        SelectedDuplicatePolicy = Current.DuplicatePolicy;
         SelectedTheme = Current.Theme;
         OnPropertyChanged(nameof(OutputDirectoryDisplay));
     }
@@ -87,9 +105,25 @@ public partial class SettingsViewModel(
 
         Current.MaxParallelDownloads = maxParallel;
         Current.Retries = retries;
+        Current.BandwidthLimitKbps = ParseNullablePositiveInt(BandwidthLimitKbpsInput);
+        Current.BandwidthWindowStart = string.IsNullOrWhiteSpace(BandwidthWindowStartInput) ? "23:00" : BandwidthWindowStartInput.Trim();
+        Current.BandwidthWindowEnd = string.IsNullOrWhiteSpace(BandwidthWindowEndInput) ? "07:00" : BandwidthWindowEndInput.Trim();
+        Current.DuplicatePolicy = SelectedDuplicatePolicy;
         Current.Theme = SelectedTheme;
         themeService.Apply(SelectedTheme);
         await settingsService.SaveAsync(Current);
         StatusMessage = "Settings saved.";
+    }
+
+    private static int? ParseNullablePositiveInt(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0
+            ? value
+            : null;
     }
 }

@@ -8,7 +8,7 @@ public interface IQueueService
     ObservableCollection<DownloadJob> Jobs { get; }
     Task LoadPersistedJobsAsync();
     Task PersistAsync();
-    Task EnqueueAsync(DownloadJob job);
+    Task<EnqueueResult> EnqueueAsync(DownloadJob job);
     void Pause(Guid id);
     void Resume(Guid id);
     void Retry(Guid id);

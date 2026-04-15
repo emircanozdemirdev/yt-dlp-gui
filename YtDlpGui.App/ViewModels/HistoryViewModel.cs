@@ -116,7 +116,11 @@ public partial class HistoryViewModel : ObservableObject
                 SelectedFormatId = "best"
             };
 
-            await queueService.EnqueueAsync(job);
+            var enqueueResult = await queueService.EnqueueAsync(job);
+            if (!enqueueResult.Accepted)
+            {
+                continue;
+            }
         }
 
         await historyService.DeleteAsync(selected.Select(x => x.Id));

@@ -17,6 +17,7 @@ public partial class MainViewModel : ObservableObject
         this.queueService = queueService;
         Settings = new SettingsViewModel(settingsService, themeService);
         QuickDownload = new QuickDownloadViewModel(ytDlpService, queueService, Settings);
+        PlaylistDownload = new PlaylistDownloadViewModel(queueService, Settings);
         Queue = new QueueViewModel(queueService);
         History = new HistoryViewModel(historyService, queueService);
     }
@@ -25,10 +26,12 @@ public partial class MainViewModel : ObservableObject
     {
         await queueService.LoadPersistedJobsAsync();
         await Settings.LoadAsync();
+        QuickDownload.RefreshProfilesFromSettings();
         await History.LoadAsync();
     }
 
     public QuickDownloadViewModel QuickDownload { get; }
+    public PlaylistDownloadViewModel PlaylistDownload { get; }
     public QueueViewModel Queue { get; }
     public HistoryViewModel History { get; }
     public SettingsViewModel Settings { get; }

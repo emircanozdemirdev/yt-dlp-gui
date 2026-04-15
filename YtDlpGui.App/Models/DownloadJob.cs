@@ -46,6 +46,27 @@ public partial class DownloadJob : ObservableObject
     [ObservableProperty]
     private string? temporaryDirectory;
 
+    [ObservableProperty]
+    private bool isPlaylist;
+
+    [ObservableProperty]
+    private int? effectiveRateLimitKbps;
+
+    [ObservableProperty]
+    private bool useDownloadArchive;
+
+    [ObservableProperty]
+    private string currentPlaylistItem = "-";
+
+    [ObservableProperty]
+    private int playlistItemCount;
+
+    [ObservableProperty]
+    private int currentPlaylistIndex;
+
+    [ObservableProperty]
+    private double currentItemProgressPercent;
+
     private readonly HashSet<string> artifactPaths = [];
 
     [ObservableProperty]
@@ -55,6 +76,18 @@ public partial class DownloadJob : ObservableObject
         Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused;
     public bool CanCancel => Status is DownloadStatus.Pending or DownloadStatus.Running or DownloadStatus.Paused;
     public string PauseResumeActionText => Status == DownloadStatus.Paused ? "Resume" : "Pause";
+    public string PlaylistProgressText =>
+        IsPlaylist && PlaylistItemCount > 0 && CurrentPlaylistIndex > 0
+            ? $"{CurrentPlaylistIndex}/{PlaylistItemCount}"
+            : "-";
+    public string ListProgressDisplay =>
+        IsPlaylist
+            ? PlaylistProgressText
+            : "-";
+    public double ActiveItemProgressPercent =>
+        IsPlaylist
+            ? CurrentItemProgressPercent
+            : ProgressPercent;
 
     partial void OnStatusChanged(DownloadStatus value)
     {
@@ -62,6 +95,28 @@ public partial class DownloadJob : ObservableObject
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(PauseResumeActionText));
     }
+
+    partial void OnPlaylistItemCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(PlaylistProgressText));
+        OnPropertyChanged(nameof(ListProgressDisplay));
+    }
+
+    partial void OnCurrentPlaylistIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(PlaylistProgressText));
+        OnPropertyChanged(nameof(ListProgressDisplay));
+    }
+
+    partial void OnIsPlaylistChanged(bool value)
+    {
+        OnPropertyChanged(nameof(PlaylistProgressText));
+        OnPropertyChanged(nameof(ListProgressDisplay));
+        OnPropertyChanged(nameof(ActiveItemProgressPercent));
+    }
+
+    partial void OnProgressPercentChanged(double value) => OnPropertyChanged(nameof(ActiveItemProgressPercent));
+    partial void OnCurrentItemProgressPercentChanged(double value) => OnPropertyChanged(nameof(ActiveItemProgressPercent));
 
     public void RegisterArtifactPath(string? path)
     {

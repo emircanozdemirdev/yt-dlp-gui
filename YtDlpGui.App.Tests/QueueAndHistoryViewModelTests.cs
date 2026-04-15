@@ -62,7 +62,9 @@ public class QueueAndHistoryViewModelTests
             new FakeYtDlpService(),
             new FakeSettingsService(),
             history,
-            new InlineUiDispatcher());
+            new InlineUiDispatcher(),
+            new FakeUserPromptService(),
+            new FakeNotificationService());
 
         var job = new DownloadJob
         {
@@ -85,10 +87,14 @@ public class QueueAndHistoryViewModelTests
         public ObservableCollection<DownloadJob> Jobs { get; } = [];
         public Task LoadPersistedJobsAsync() => Task.CompletedTask;
         public Task PersistAsync() => Task.CompletedTask;
-        public Task EnqueueAsync(DownloadJob job)
+        public Task<EnqueueResult> EnqueueAsync(DownloadJob job)
         {
             Jobs.Add(job);
-            return Task.CompletedTask;
+            return Task.FromResult(new EnqueueResult
+            {
+                Accepted = true,
+                Message = "Added to queue."
+            });
         }
         public void Pause(Guid id) { }
         public void Resume(Guid id) { }
@@ -137,5 +143,16 @@ public class QueueAndHistoryViewModelTests
     private sealed class InlineUiDispatcher : IUiDispatcher
     {
         public void Invoke(Action action) => action();
+    }
+
+    private sealed class FakeUserPromptService : IUserPromptService
+    {
+        public DuplicatePromptAction ResolveDuplicate(string url) => DuplicatePromptAction.AddAnyway;
+    }
+
+    private sealed class FakeNotificationService : INotificationService
+    {
+        public void Notify(string title, string message) { }
+        public void PlayCompletionSound() { }
     }
 }
