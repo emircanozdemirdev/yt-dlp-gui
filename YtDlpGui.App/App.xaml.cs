@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using YtDlpGui.App.Infrastructure;
 using YtDlpGui.App.Services;
 using YtDlpGui.App.ViewModels;
@@ -15,6 +15,8 @@ public partial class App : Application
 
         try
         {
+            await ToolBootstrapper.EnsureToolsPresentAsync();
+
             var processRunner = new ProcessRunner();
             var progressParser = new ProgressParser();
             var ytDlpService = new YtDlpService(processRunner, progressParser);
@@ -32,6 +34,19 @@ public partial class App : Application
                 notificationService);
             var themeService = new ThemeService();
             var settings = await settingsService.LoadAsync();
+
+            // Eğer kullanıcı daha önce özel bir yol belirtmemişse,
+            // bootstrapper'ın indirdiği araçları kullan.
+            var toolsDir = ToolBootstrapper.UserToolsDirectory;
+            if (string.Equals(settings.YtDlpPath, "yt-dlp", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.YtDlpPath = Path.Combine(toolsDir, "yt-dlp.exe");
+            }
+            if (string.Equals(settings.FfmpegPath, "ffmpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.FfmpegPath = Path.Combine(toolsDir, "ffmpeg.exe");
+            }
+
             themeService.Apply(settings.Theme);
 
             var mainVm = new MainViewModel(

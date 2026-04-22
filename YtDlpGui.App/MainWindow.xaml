@@ -68,7 +68,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Margin="0,16,0,0" Background="{DynamicResource BrushSurface}"
+                    <Border Grid.Row="1" Margin="0,16,0,0" Background="{DynamicResource BrushSurface}"
                             BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
                         <Grid>
                             <Grid.RowDefinitions>
